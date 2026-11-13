@@ -1,0 +1,20 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.4xx'
+      - run: dotnet restore FinanceFlow.slnx --configfile NuGet.Config
+      - run: dotnet build FinanceFlow.slnx --configuration Release --no-restore
+      - run: dotnet test FinanceFlow.slnx --configuration Release --no-build --no-restore
