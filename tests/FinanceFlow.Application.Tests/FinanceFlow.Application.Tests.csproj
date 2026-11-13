@@ -3,8 +3,6 @@
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
     <OutputType>Exe</OutputType>
-    <!-- Temporary: this foundation project has no application cases/tests yet. Remove when adding its first tests. -->
-    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/FinanceFlow.Application/FinanceFlow.Application.csproj" />

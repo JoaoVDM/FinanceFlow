@@ -1,3 +1,3 @@
 # Testes de aplicação
 
-Projeto xUnit preparado para os próximos casos de uso. A Application ainda não contém funcionalidades, portanto não há testes artificiais nem mocks de serviços inexistentes. Os testes efetivos da fundação estão em FinanceFlow.IntegrationTests.
+Testes xUnit das regras de entrada dos casos de uso de identidade: limites de senha, nome e e-mail. A tolerância ao código 8 foi removida porque este projeto agora tem casos reais. A integração entre Identity, HTTP e SQL Server fica em FinanceFlow.IntegrationTests, sem simular banco.

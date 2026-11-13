@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FinanceFlow.IntegrationTests;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/v1/__tests")]
 public sealed class TestOnlyController : ControllerBase
 {

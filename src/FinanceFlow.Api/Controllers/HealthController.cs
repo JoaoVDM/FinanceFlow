@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using FinanceFlow.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace FinanceFlow.Api.Controllers;
 
 /// <summary>Process liveness; no database or external dependency checks.</summary>
 [ApiController]
+[AllowAnonymous]
 [Route("health")]
 public sealed class HealthController : ControllerBase
 {
@@ -11,6 +15,27 @@ public sealed class HealthController : ControllerBase
     [HttpGet("live")]
     [ProducesResponseType<HealthResponse>(StatusCodes.Status200OK)]
     public ActionResult<HealthResponse> Get() => Ok(new HealthResponse("healthy"));
+
+    [HttpGet("ready")]
+    [ProducesResponseType<HealthResponse>(200), ProducesResponseType<HealthResponse>(503)]
+    public async Task<IActionResult> Ready([FromServices] FinanceFlowDbContext db, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!await db.Database.CanConnectAsync(cancellationToken)
+                || (await db.Database.GetPendingMigrationsAsync(cancellationToken)).Any())
+                return StatusCode(503, new HealthResponse("notReady"));
+            // Verify required runtime columns as well as the migration history.
+            await db.Users.AsNoTracking().OrderBy(x => x.Id)
+                .Select(x => new { x.Id, x.NormalizedEmail, x.IsActive, x.TokenVersion })
+                .Take(1).ToListAsync(cancellationToken);
+            return Ok(new HealthResponse("ready"));
+        }
+        catch (Exception exception) when (exception is System.Data.Common.DbException or InvalidOperationException or TimeoutException)
+        {
+            return StatusCode(503, new HealthResponse("notReady"));
+        }
+    }
 }
 
 public sealed record HealthResponse(string Status);
