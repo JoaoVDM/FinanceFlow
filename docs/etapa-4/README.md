@@ -1,6 +1,6 @@
-# Etapa 4 — Entrega A: contas financeiras
+# Etapa 4 — Contas e categorias
 
-Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, publicada no commit `5a13762`. Foram confirmados 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas, API Docker healthy e fluxos HTTPS Development/Production aprovados. O usuário confirmou GitHub Actions `43559125753` com **Success** nesse commit; essa evidência externa não cobre alterações posteriores. A Etapa 4 completa depende das futuras Entregas B/C; nenhuma delas começou. Evidências externas, histórico do sandbox e comandos de reprodução em [validação](entrega-a-validacao.md).
+Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, publicada no commit `5a13762`. Foram confirmados 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas, API Docker healthy e fluxos HTTPS Development/Production aprovados. O usuário confirmou GitHub Actions `43559125753` com **Success** nesse commit; essa evidência externa não cobre alterações posteriores. Esse é o fechamento histórico da Entrega A. A Entrega C não começou; a implementação local de B está descrita abaixo. Evidências externas, histórico do sandbox e comandos de reprodução em [validação](entrega-a-validacao.md).
 
 ## Decisões aprovadas e limites
 
@@ -10,7 +10,7 @@ Status: **Entrega A concluída e validada externamente pelo usuário no PowerShe
 - Id/owner gerados/obtidos no servidor. Nome obrigatório até 100, trim/NFC, sem unicidade exigida.
 - Proprietário, moeda, abertura e saldo inicial não têm edição. Não há saldo atual persistido.
 - Contas inicialmente ativas. Listas sem filtro incluem inativas; não há endpoint de alteração/inativação nesta entrega.
-- A política de categorias aprovada para B é Trim + NFC + ToUpperInvariant + NFC, acentos significativos e comparação binária na coluna normalizada. Não foram criados Category, tabelas ou rotas de categorias; Identity/collation global permaneceram intactos.
+- A política de categorias aprovada para B é Trim + NFC + ToUpperInvariant + NFC, acentos significativos e comparação binária na coluna normalizada. Na Entrega A não foram criados Category, tabelas ou rotas de categorias. A Entrega B mantém essa política sem modificar Identity ou a collation global.
 
 ## Arquitetura implementada
 
@@ -71,8 +71,12 @@ Api: AspNetUsers mantém SELECT/INSERT/UPDATE; history mantém SELECT; Financial
 
 Toda busca/lista/count/replay usa UserId confiável. O middleware JWT continua conferindo IsActive/TokenVersion a cada requisição. Erros usam Problem Details sanitizado; snapshots e chaves não são logados. Nenhuma alteração no fluxo de logout/senha/revogação foi necessária.
 
+## Refatoração publicada e Entrega B local
+
+O usuário confirmou a publicação da refatoração em **9c938c8**, com GitHub Actions **43564544104 — Success**. As validações e limitações históricas estão em [refatoração de legibilidade](refatoracao-legibilidade.md); essa CI não comprova alterações posteriores.
+
+A Entrega B implementa Category e somente POST/GET /api/v1/categories e GET /api/v1/categories/{id}. Preserva kind imutável (income/expense), nome Trim/NFC e unicidade por usuário/tipo com Trim/NFC/ToUpperInvariant/NFC e comparação BIN2. Não exige Idempotency-Key. Inclui migration incremental, SELECT/INSERT restritos, readiness e testes SQL obrigatórios. Em **14/11/2026**, o usuário confirmou externamente **216 testes aprovados, 0 falhas e 0 ignorados**, incluindo SQL Server/Testcontainers, e auditoria com restauração bem-sucedida e sete projetos sem vulnerabilidades conhecidas nas fontes consultadas. Os avisos NU1900 dos testes e as falhas históricas de acesso ao Docker no sandbox permanecem registrados; não se afirma novo build totalmente sem warnings. A Entrega B ainda não foi publicada nem validada por nova execução de GitHub Actions, e não há confirmação de aplicação a banco persistente. Detalhes em [entrega-b-validacao](entrega-b-validacao.md).
+
 ## Próximas entregas
 
-A publicação da Entrega A e sua CI foram confirmadas pelo usuário. A [refatoração de legibilidade](refatoracao-legibilidade.md) é manutenção posterior, sem nova funcionalidade. Em 14/11/2026, o usuário confirmou sua validação externa: 151 testes aprovados, incluindo integração SQL com Testcontainers, auditoria posterior sem pacotes vulneráveis nos sete projetos e git diff --check aprovado. Os três avisos NU1900 da execução dos testes e as limitações históricas do sandbox foram preservados; não se afirma novo build sem esses avisos. Revisar essa manutenção antes de um futuro commit autorizado; não foi informado novo resultado de CI para a refatoração.
-
-B: categorias com política já aprovada. C: alterações/atividade, If-Match e testes adicionais de escrita concorrente. Nenhum endpoint dessas entregas foi antecipado; seu início exige autorização específica. FinancialTransaction, saldo atual, transferências, extratos e relatórios continuam nas etapas posteriores.
+Revisar a Entrega B, com testes SQL e auditoria externos concluídos, antes de um futuro commit e publicação autorizados; sua nova CI ainda não foi validada. C permanece fora do escopo: alterações/atividade, If-Match e testes adicionais de escrita concorrente exigem autorização específica. FinancialTransaction, saldo atual, transferências, extratos e relatórios continuam nas etapas posteriores.

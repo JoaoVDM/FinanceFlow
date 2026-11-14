@@ -1,5 +1,7 @@
 using FinanceFlow.Application.Users;
 using FinanceFlow.Application.Accounts;
+using FinanceFlow.Application.Categories;
+using FinanceFlow.Infrastructure.Persistence.Categories;
 using FinanceFlow.Infrastructure.Persistence.Accounts;
 using FinanceFlow.Infrastructure.Authentication;
 using FinanceFlow.Infrastructure.Configuration;
@@ -22,6 +24,8 @@ public static class DependencyInjection
         services.AddSingleton<FinancialCalendar>();
         services.AddScoped<FinancialAccountsService>();
         services.AddScoped<IFinancialAccountStore, FinancialAccountStore>();
+        services.AddScoped<CategoriesService>();
+        services.AddScoped<ICategoryStore, CategoryStore>();
         services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
         services.AddOptions<DatabaseOptions>().Bind(configuration.GetSection(DatabaseOptions.SectionName)).ValidateOnStart();
         services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();

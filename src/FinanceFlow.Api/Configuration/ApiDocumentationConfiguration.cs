@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
 using FinanceFlow.Api.Contracts.Accounts;
+using FinanceFlow.Api.Contracts.Categories;
+using FinanceFlow.Application.Categories;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -19,6 +21,7 @@ internal static class ApiDocumentationConfiguration
         services.AddOpenApi("v1", options =>
         {
             options.AddSchemaTransformer(ConfigureAccountSchemasAsync);
+            options.AddSchemaTransformer(ConfigureCategorySchemasAsync);
             options.AddDocumentTransformer(ConfigureDocumentAsync);
         });
 
@@ -82,6 +85,7 @@ internal static class ApiDocumentationConfiguration
 
         ConfigureBearerRequirements(document);
         ConfigureAccountOperations(document);
+        ConfigureCategoryOperations(document);
         return Task.CompletedTask;
     }
 
@@ -95,6 +99,7 @@ internal static class ApiDocumentationConfiguration
         var protectedPaths = document.Paths.Where(path =>
             path.Key.StartsWith("/api/v1/users", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/accounts", StringComparison.Ordinal)
+            || path.Key.StartsWith("/api/v1/categories", StringComparison.Ordinal)
             || path.Key.EndsWith("/auth/logout", StringComparison.Ordinal));
 
         foreach (var path in protectedPaths)
@@ -177,6 +182,118 @@ internal static class ApiDocumentationConfiguration
                                 Schema = new OpenApiSchema { Type = JsonSchemaType.String }
                             };
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    private static Task ConfigureCategorySchemasAsync(
+        OpenApiSchema schema,
+        OpenApiSchemaTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        if ((context.JsonTypeInfo.Type == typeof(CreateCategoryRequest) || context.JsonTypeInfo.Type == typeof(CategoryView))
+            && schema.Properties is not null)
+        {
+            schema.Properties["kind"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String,
+                Enum = [JsonValue.Create("income"), JsonValue.Create("expense")]
+            };
+            if (schema.Properties["name"] is OpenApiSchema name)
+            {
+                name.Description = "Required, 1–100 UTF-16 code units after Trim and NFC. Normalized uppercase NFC name must also fit 100; accents are significant.";
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void ConfigureCategoryOperations(OpenApiDocument document)
+    {
+        if (document.Paths is null)
+        {
+            return;
+        }
+
+        var categoryPaths = document.Paths.Where(path => path.Key.StartsWith("/api/v1/categories", StringComparison.Ordinal));
+        foreach (var path in categoryPaths)
+        {
+            if (path.Value.Operations is null)
+            {
+                continue;
+            }
+
+            foreach (var (method, operation) in path.Value.Operations)
+            {
+                if (method == HttpMethod.Get && operation.Parameters is not null)
+                {
+                    foreach (var parameter in operation.Parameters.OfType<OpenApiParameter>())
+                    {
+                        parameter.Schema = parameter.Name switch
+                        {
+                            "kind" => new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.String,
+                                Enum = [JsonValue.Create("income"), JsonValue.Create("expense")]
+                            },
+                            "sort" => new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.String,
+                                Enum = [JsonValue.Create("name"), JsonValue.Create("id")],
+                                Default = JsonValue.Create("name")
+                            },
+                            "direction" => new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.String,
+                                Enum = [JsonValue.Create("asc"), JsonValue.Create("desc")],
+                                Default = JsonValue.Create("asc")
+                            },
+                            "page" => new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.Integer,
+                                Minimum = "1",
+                                Default = JsonValue.Create(1)
+                            },
+                            "pageSize" => new OpenApiSchema
+                            {
+                                Type = JsonSchemaType.Integer,
+                                Minimum = "1",
+                                Maximum = "100",
+                                Default = JsonValue.Create(20)
+                            },
+                            _ => parameter.Schema
+                        };
+                    }
+                }
+
+                if (operation.Responses is null)
+                {
+                    continue;
+                }
+
+                foreach (var (status, response) in operation.Responses)
+                {
+                    if (response is not OpenApiResponse writable
+                        || (status != "201" && !(status == "200" && path.Key.Contains("{id}", StringComparison.Ordinal))))
+                    {
+                        continue;
+                    }
+
+                    writable.Headers ??= new Dictionary<string, IOpenApiHeader>();
+                    writable.Headers["ETag"] = new OpenApiHeader
+                    {
+                        Description = "Strong opaque SQL rowversion validator.",
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String }
+                    };
+                    if (status == "201")
+                    {
+                        writable.Headers["Location"] = new OpenApiHeader
+                        {
+                            Description = "Relative URL of the created category.",
+                            Schema = new OpenApiSchema { Type = JsonSchemaType.String }
+                        };
                     }
                 }
             }

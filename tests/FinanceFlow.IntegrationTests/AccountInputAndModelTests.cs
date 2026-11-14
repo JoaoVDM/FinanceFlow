@@ -60,7 +60,7 @@ public sealed class AccountInputAndModelTests
         Assert.True(getHeaders.TryGetProperty("ETag", out _));
         Assert.False(individual.TryGetProperty("put", out _));
         Assert.False(individual.TryGetProperty("patch", out _));
-        Assert.False(paths.TryGetProperty("/api/v1/categories", out _));
+        Assert.True(paths.TryGetProperty("/api/v1/categories", out _));
         var amount = json.RootElement.GetProperty("components").GetProperty("schemas")
             .GetProperty("CreateAccountRequest").GetProperty("properties").GetProperty("openingBalance");
         Assert.Equal("number", amount.GetProperty("type").GetString());

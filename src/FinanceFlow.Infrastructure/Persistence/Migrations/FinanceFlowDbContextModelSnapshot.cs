@@ -6,5 +6,5 @@ namespace FinanceFlow.Infrastructure.Persistence.Migrations;
 [DbContext(typeof(FinanceFlowDbContext))]
 public sealed class FinanceFlowDbContextModelSnapshot : ModelSnapshot
 {
-    protected override void BuildModel(ModelBuilder modelBuilder) => AccountsDeliveryAModel.Build(modelBuilder);
+    protected override void BuildModel(ModelBuilder modelBuilder) => CategoriesDeliveryBModel.Build(modelBuilder);
 }

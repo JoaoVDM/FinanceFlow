@@ -6,7 +6,11 @@ API REST de gestão financeira pessoal desenvolvida como portfólio profissional
 
 Etapas 1, 2 e 3 concluídas e publicadas. O usuário confirmou, após as últimas correções, build de sete projetos sem erros/warnings, 73 testes aprovados, 22 verificações HTTPS Development, três Production e GitHub Actions 43439337019 com Success no commit 29fe1c0. São evidências externas, registradas em [docs/etapa-3](docs/etapa-3/validacao.md).
 
-A Entrega A da Etapa 4 está concluída e validada externamente pelo usuário: 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas e API Docker healthy. Os scripts HTTPS de identidade (22 verificações) e contas passaram; em Production, readiness respondeu 200 e OpenAPI/Swagger 404. A Entrega A foi publicada no commit `5a13762`; o usuário confirmou GitHub Actions `43559125753` com **Success**. Essas são evidências externas do commit publicado, anteriores à [refatoração de legibilidade](docs/etapa-4/refatoracao-legibilidade.md), cuja validação é registrada separadamente. A Etapa 4 completa depende de B/C, ainda não iniciadas. Veja [escopo](docs/etapa-4/README.md) e [evidências externas e histórico do sandbox](docs/etapa-4/entrega-a-validacao.md). Esta API é um portfólio, sem prontidão operacional de produto financeiro público.
+A Entrega A da Etapa 4 está concluída e validada externamente pelo usuário: 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas e API Docker healthy. Os scripts HTTPS de identidade (22 verificações) e contas passaram; em Production, readiness respondeu 200 e OpenAPI/Swagger 404. A Entrega A foi publicada no commit `5a13762`; o usuário confirmou GitHub Actions `43559125753` com **Success**. Essas são evidências externas do commit publicado, anteriores à [refatoração de legibilidade](docs/etapa-4/refatoracao-legibilidade.md), cuja validação é registrada separadamente. A Etapa 4 completa ainda depende da Entrega C, que não foi iniciada. Veja [escopo](docs/etapa-4/README.md) e [evidências externas e histórico do sandbox](docs/etapa-4/entrega-a-validacao.md). Esta API é um portfólio, sem prontidão operacional de produto financeiro público.
+
+A refatoração foi publicada em **9c938c8**, com GitHub Actions **43564544104 — Success**, conforme evidência fornecida pelo usuário. Essa é a baseline da Entrega B e não comprova as alterações locais posteriores.
+
+A **Entrega B — Categorias Financeiras** está implementada e foi validada externamente pelo usuário em **14/11/2026**: 216 testes aprovados, 0 falhas e 0 ignorados, incluindo SQL Server/Testcontainers; a auditoria posterior concluiu a restauração e não identificou vulnerabilidades conhecidas nos sete projetos nas fontes consultadas. Os testes apresentaram avisos NU1900; não se afirma novo build totalmente sem warnings. A Entrega B ainda não foi publicada nem validada por nova execução do GitHub Actions. As evidências não confirmam aplicação a banco persistente; resultados externos e histórico do Docker inacessível no sandbox em [entrega-b-validacao](docs/etapa-4/entrega-b-validacao.md).
 
 ## Requisitos e instalação
 
@@ -92,9 +96,21 @@ Readiness consulta conexão, migrations pendentes, colunas do usuário e acesso 
 | GET | /api/v1/accounts | JWT; filtros isActive/type; page=1, pageSize=20 (máximo 100), sort=name ou id, direction=asc ou desc |
 | GET | /api/v1/accounts/{id} | JWT; 200 com ETag forte; recurso alheio/inexistente retorna 404 |
 
-Entrada de criação: name, type, currency, openingBalance e openingDate. Tipos estritos: checking, savings, cash, other; somente BRL; saldo inicial entre -999999999999.99 e 999999999999.99 com centavos exatos; abertura não futura no calendário America/Sao_Paulo. Valores JSON não são convertidos via double/float, e precisão excessiva não pode apagar frações. Usuário e timestamps não são aceitos no corpo. Contas inativas são incluídas por padrão. Não há PUT/PATCH, categorias ou saldo atual nesta entrega.
+Entrada de criação: name, type, currency, openingBalance e openingDate. Tipos estritos: checking, savings, cash, other; somente BRL; saldo inicial entre -999999999999.99 e 999999999999.99 com centavos exatos; abertura não futura no calendário America/Sao_Paulo. Valores JSON não são convertidos via double/float, e precisão excessiva não pode apagar frações. Usuário e timestamps não são aceitos no corpo. Contas inativas são incluídas por padrão. A Entrega A não inclui PUT/PATCH nem saldo atual; categorias pertencem à Entrega B abaixo.
 
 Na preparação de um ambiente, aplique explicitamente a migration incremental 20261114000100_AccountsDeliveryA e repita o provisionamento para conceder SELECT/INSERT nas novas tabelas. A API não recebe UPDATE/DELETE nelas e não executa migrations no startup. O usuário confirmou essa sequência e o fluxo HTTPS de `./scripts/Test-LocalAccounts.ps1` no fechamento da Entrega A; o Codex não executou o [procedimento externo](docs/etapa-4/entrega-a-validacao.md#validação-externa) no banco persistente. O script preserva os registros e desativa somente o usuário fictício que criou, sem imprimir tokens/senhas.
+
+## Categorias financeiras — Entrega B
+
+| Método | Rota | Contrato |
+|---|---|---|
+| POST | /api/v1/categories | JWT; name/kind; 201 com Location/ETag; sem Idempotency-Key; 400/401/409/429/503 |
+| GET | /api/v1/categories | JWT; kind/isActive opcionais; page=1, pageSize=20 (máximo 100); sort=name ou id; direction=asc ou desc |
+| GET | /api/v1/categories/{id} | JWT; 200 com ETag forte; alheia/inexistente retorna o mesmo 404 |
+
+Kind é exatamente income ou expense. Name preserva Trim/NFC; NormalizedName usa Trim/NFC/ToUpperInvariant/NFC, com ambos limitados a 100 unidades UTF-16 após normalização. Café/CAFÉ conflitam; Cafe/Café são distintos. O índice único SQL por proprietário, tipo e nome normalizado usa comparação binária e inclui inativas. Campos internos/controlados pelo servidor são rejeitados no JSON. Não há replay, edição, renomeação, desativação ou exclusão de categorias nesta entrega.
+
+A migration incremental é `20261114000200_CategoriesDeliveryB`. Provisionamento atualizado concede somente SELECT/INSERT em Categories, após aplicação explícita da migration com credencial separada. Nada disso foi executado no banco persistente pelo Codex. Readiness passa a exigir a nova tabela e acesso de leitura; liveness permanece independente. Veja [modelo, testes e procedimento externo](docs/etapa-4/entrega-b-validacao.md).
 
 ## Endpoints de identidade
 
@@ -137,8 +153,8 @@ O framework registra Data Protection com a autenticação, mas as funcionalidade
 FinanceFlow.slnx
 src/
   FinanceFlow.Api/              HTTP, controllers, erros, OpenAPI e composição
-  FinanceFlow.Application/      Casos de uso de contas, proprietário e contratos de identidade
-  FinanceFlow.Domain/           FinancialAccount e invariantes financeiras
+  FinanceFlow.Application/      Casos de uso de contas/categorias, proprietário e contratos de identidade
+  FinanceFlow.Domain/           FinancialAccount, Category e invariantes financeiras
   FinanceFlow.Infrastructure/   Identity, EF Core, JWT e operações explícitas de banco
 tests/
   FinanceFlow.Domain.Tests/
@@ -148,7 +164,7 @@ docs/
   etapa-1/                     Planejamento aprovado e sete ADRs
   etapa-2/                     Implementação e evidências da fundação
   etapa-3/                     Identidade, evidências externas e revisão final
-  etapa-4/                     Entrega A: contas, idempotência e evidências de validação
+  etapa-4/                     Entregas A/B, refatoração e evidências de validação
 ```
 
 Referências: Api → Application/Infrastructure; Application → Domain; Infrastructure → Application/Domain; Domain sem referências de projeto ou pacotes de infraestrutura. Os projetos sem funcionalidades permanecem sem classes artificiais. Não há CQRS completo, MediatR, repositório genérico ou mapeamento automático.
@@ -157,12 +173,12 @@ Referências: Api → Application/Infrastructure; Application → Domain; Infras
 
 Tratamento global de exceções e Problem Details em todos os ambientes. Respostas de erro incluem status, title, instance, code e traceId; validação acrescenta errors. Stack traces e mensagens internas de exceção não são retornadas ao cliente. Erros são registrados no servidor; não registrar credenciais/corpos sensíveis quando as próximas funcionalidades forem adicionadas.
 
-Os testes usam xUnit e Microsoft.Testing.Platform no .NET 10. Domain.Tests cobre contas; Application.Tests cobre identidade e casos de uso financeiros. Nenhum projeto tolera mais código 8 por ausência de testes. IntegrationTests preserva a fundação/identidade e acrescenta contas, parsing exato, modelo/migration, idempotência e SQL Server real com Testcontainers.MsSql. Não há EF InMemory ou SQLite. Fixtures geram credenciais efêmeras e bancos isolados; indisponibilidade do Docker falha os testes obrigatórios, sem skip/fallback. Controllers técnicos de falha existem somente no assembly de teste.
+Os testes usam xUnit e Microsoft.Testing.Platform no .NET 10. Domain.Tests cobre contas e categorias; Application.Tests cobre identidade e casos de uso financeiros. Nenhum projeto tolera mais código 8 por ausência de testes. IntegrationTests preserva a fundação/identidade e acrescenta contas/categorias, parsing exato, normalização, modelo/migrations, idempotência e SQL Server real com Testcontainers.MsSql. Não há EF InMemory ou SQLite. Fixtures geram credenciais efêmeras e bancos isolados; indisponibilidade do Docker falha os testes obrigatórios, sem skip/fallback. Controllers técnicos de falha existem somente no assembly de teste.
 
-O workflow em .github/workflows/build.yml verifica Docker e executa restore, build e toda a suíte, incluindo SQL. Não exige segredos reais da máquina do runner. Conforme evidência fornecida pelo usuário, a CI da Etapa 3 foi aprovada e a Entrega A publicada em `5a13762` teve **Success** na execução `43559125753`. Isso não representa validação remota das alterações posteriores de legibilidade.
+O workflow em .github/workflows/build.yml verifica Docker e executa restore, build e toda a suíte, incluindo SQL. Não exige segredos reais da máquina do runner. Conforme evidência fornecida pelo usuário, a CI da Etapa 3 foi aprovada e a Entrega A publicada em `5a13762` teve **Success** na execução `43559125753`. A refatoração publicada em `9c938c8` também teve CI `43564544104` aprovada, conforme confirmação do usuário. Nenhuma dessas execuções comprova a Entrega B local; seu workflow não foi disparado pelo Codex.
 
 ## Próximos passos
 
-Revisar a manutenção de legibilidade antes de preparar um commit autorizado. Em 14/11/2026, o usuário confirmou externamente 151 testes aprovados, incluindo integração SQL com Testcontainers, e auditoria posterior sem pacotes vulneráveis nos sete projetos. Os três avisos NU1900 observados durante os testes permanecem registrados; não foi informado novo build sem esses avisos. A publicação e a CI da Entrega A já foram confirmadas pelo usuário; as evidências da manutenção estão [registradas separadamente](docs/etapa-4/refatoracao-legibilidade.md), sem novo resultado de CI para esta refatoração. As Entregas B/C e a Etapa 5 não foram iniciadas. Normalização de categorias já aprovada (Trim/NFC/ToUpperInvariant, acentos significativos e comparação binária) está registrada para B, sem entidade ou endpoints antecipados. Veja [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
+Revisar as alterações da Entrega B, já validada externamente pelo usuário, antes de preparar um commit e publicação autorizados. Uma nova execução do GitHub Actions da Entrega B ainda não foi validada; não há confirmação de aplicação a banco persistente. A regressão/auditoria da refatoração anterior e sua publicação em 9c938c8 mantêm seu histórico próprio. Entrega C e Etapa 5 não foram iniciadas. Veja [evidências da Entrega B](docs/etapa-4/entrega-b-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
 
 Licença MIT é a proposta registrada para a preparação da release; nenhum arquivo de licença foi incluído nesta etapa. Resultados de testes e prontidão devem ser avaliados pelas evidências, sem badges de sucesso não verificados.

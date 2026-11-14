@@ -136,3 +136,7 @@ Em futuras execuções, conferir **151 aprovados, zero falhas e zero ignorados**
 - O tratamento existente de deadlock executa rollback explícito; avaliar em mudança funcional separada o cenário em que o servidor já encerrou a transação e o rollback possa ocultar a exceção inicial. Esse cenário não foi reproduzido nesta execução e a política não foi modificada.
 
 Status: **refatoração implementada e validada externamente pelo usuário: 151 testes aprovados, incluindo integração SQL, e auditoria NuGet concluída sem pacotes vulneráveis identificados**. O build aprovado pelo Codex mantém o registro dos três avisos NU1900. Pronta para revisão das alterações, preservando as limitações históricas do sandbox e os riscos técnicos para avaliação funcional futura; sem novo resultado de CI informado para esta manutenção.
+
+## Publicação posterior confirmada
+
+Após o fechamento externo acima, o usuário confirmou a publicação da refatoração no commit **9c938c8 — refactor: improve code readability and maintainability** e o GitHub Actions **43564544104 — Success**. As menções anteriores a publicação/CI pendentes registram o estado histórico antes desse fechamento. Essa baseline não comprova a implementação posterior da Entrega B, que possui [validação própria](entrega-b-validacao.md).
