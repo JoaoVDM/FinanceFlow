@@ -15,8 +15,11 @@ public sealed class AccountInputAndModelTests
     [InlineData("/api/v1/accounts/9a48df08-cf0f-4b85-a4c2-82262dbab2de")]
     public async Task Account_reads_require_authentication(string path)
     {
-        using var factory = new ApiFactory(); using var client = factory.CreateClient();
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
+
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).Scheme);
     }
@@ -24,26 +27,42 @@ public sealed class AccountInputAndModelTests
     [Fact]
     public async Task Creation_requires_authentication_even_with_valid_request_shape()
     {
-        using var factory = new ApiFactory(); using var client = factory.CreateClient();
-        using var response = await client.PostAsync("/api/v1/accounts", new StringContent("{}", Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+        using var factory = new ApiFactory();
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            "/api/v1/accounts",
+            new StringContent("{}", Encoding.UTF8, "application/json"),
+            TestContext.Current.CancellationToken);
+
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
     public async Task Openapi_documents_only_authorized_account_routes_and_headers()
     {
-        using var factory = new ApiFactory("Development"); using var client = factory.CreateClient();
+        using var factory = new ApiFactory("Development");
+        using var client = factory.CreateClient();
+
         using var response = await client.GetAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         var paths = json.RootElement.GetProperty("paths");
-        var collection = paths.GetProperty("/api/v1/accounts"); var individual = paths.GetProperty("/api/v1/accounts/{id}");
+        var collection = paths.GetProperty("/api/v1/accounts");
+        var individual = paths.GetProperty("/api/v1/accounts/{id}");
         Assert.True(collection.GetProperty("post").GetProperty("security")[0].TryGetProperty("Bearer", out _));
-        Assert.Contains(collection.GetProperty("post").GetProperty("parameters").EnumerateArray(), x => x.GetProperty("name").GetString() == "Idempotency-Key" && x.GetProperty("required").GetBoolean());
-        Assert.True(individual.GetProperty("get").GetProperty("responses").GetProperty("200").GetProperty("headers").TryGetProperty("ETag", out _));
-        Assert.False(individual.TryGetProperty("put", out _)); Assert.False(individual.TryGetProperty("patch", out _));
+        Assert.Contains(
+            collection.GetProperty("post").GetProperty("parameters").EnumerateArray(),
+            x => x.GetProperty("name").GetString() == "Idempotency-Key" && x.GetProperty("required").GetBoolean());
+        var getHeaders = individual.GetProperty("get")
+            .GetProperty("responses").GetProperty("200").GetProperty("headers");
+        Assert.True(getHeaders.TryGetProperty("ETag", out _));
+        Assert.False(individual.TryGetProperty("put", out _));
+        Assert.False(individual.TryGetProperty("patch", out _));
         Assert.False(paths.TryGetProperty("/api/v1/categories", out _));
-        var amount = json.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("CreateAccountRequest").GetProperty("properties").GetProperty("openingBalance");
+        var amount = json.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty("CreateAccountRequest").GetProperty("properties").GetProperty("openingBalance");
         Assert.Equal("number", amount.GetProperty("type").GetString());
         Assert.Equal(0.01m, amount.GetProperty("multipleOf").GetDecimal());
     }

@@ -6,9 +6,21 @@ namespace FinanceFlow.Domain.Tests;
 public sealed class FinancialAccountTests
 {
     private static readonly DateOnly Today = new(2026, 11, 14);
-    private static FinancialAccount Create(string name = " Account ", string type = "checking", string currency = "BRL",
-        decimal balance = 0m, DateOnly? openingDate = null) => FinancialAccount.Create(Guid.NewGuid(), Guid.NewGuid(),
-            name, type, currency, balance, openingDate ?? Today, Today, new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
+    private static FinancialAccount Create(
+        string name = " Account ",
+        string type = "checking",
+        string currency = "BRL",
+        decimal balance = 0m,
+        DateOnly? openingDate = null) => FinancialAccount.Create(
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        name,
+        type,
+        currency,
+        balance,
+        openingDate ?? Today,
+        Today,
+        new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
 
     [Theory]
     [InlineData("checking")]
@@ -53,10 +65,29 @@ public sealed class FinancialAccountTests
     [Fact]
     public void Exact_cents_and_signed_boundaries_are_supported()
     {
-        foreach (var value in new[] { 0m, 10.000m, 123.45m, -123.45m, FinancialAccount.MaximumOpeningBalance, -FinancialAccount.MaximumOpeningBalance })
+        foreach (var value in new[]
+        {
+            0m,
+            10.000m,
+            123.45m,
+            -123.45m,
+            FinancialAccount.MaximumOpeningBalance,
+            -FinancialAccount.MaximumOpeningBalance
+        })
+        {
             Assert.Equal(value, Create(balance: value).OpeningBalance);
-        foreach (var value in new[] { 10.001m, -0.001m, FinancialAccount.MaximumOpeningBalance + 0.01m, -FinancialAccount.MaximumOpeningBalance - 0.01m })
+        }
+
+        foreach (var value in new[]
+        {
+            10.001m,
+            -0.001m,
+            FinancialAccount.MaximumOpeningBalance + 0.01m,
+            -FinancialAccount.MaximumOpeningBalance - 0.01m
+        })
+        {
             Assert.Throws<ArgumentException>(() => Create(balance: value));
+        }
     }
 
     [Fact]
@@ -69,14 +100,41 @@ public sealed class FinancialAccountTests
     [Fact]
     public void Owner_and_identifier_are_required()
     {
-        Assert.Throws<ArgumentException>(() => FinancialAccount.Create(Guid.Empty, Guid.NewGuid(), "A", "cash", "BRL", 0, Today, Today, DateTimeOffset.UnixEpoch));
-        Assert.Throws<ArgumentException>(() => FinancialAccount.Create(Guid.NewGuid(), Guid.Empty, "A", "cash", "BRL", 0, Today, Today, DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentException>(() => FinancialAccount.Create(
+            Guid.Empty,
+            Guid.NewGuid(),
+            "A",
+            "cash",
+            "BRL",
+            0,
+            Today,
+            Today,
+            DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentException>(() => FinancialAccount.Create(
+            Guid.NewGuid(),
+            Guid.Empty,
+            "A",
+            "cash",
+            "BRL",
+            0,
+            Today,
+            Today,
+            DateTimeOffset.UnixEpoch));
     }
 
     [Fact]
     public void Immutable_financial_fields_have_no_public_setters()
     {
-        foreach (var name in new[] { "Id", "UserId", "Currency", "OpeningDate", "OpeningBalance" })
+        foreach (var name in new[]
+        {
+            "Id",
+            "UserId",
+            "Currency",
+            "OpeningDate",
+            "OpeningBalance"
+        })
+        {
             Assert.False(typeof(FinancialAccount).GetProperty(name)!.SetMethod!.IsPublic);
+        }
     }
 }

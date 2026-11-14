@@ -1,6 +1,6 @@
 # Entrega A — Evidências e critérios de validação
 
-Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, aguardando revisão e futuro commit. A Etapa 4 completa não está concluída: as Entregas B/C não foram iniciadas. O GitHub Actions da Entrega A ainda não foi executado.
+Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, posteriormente publicada no commit `5a13762`. A Etapa 4 completa não está concluída: as Entregas B/C não foram iniciadas. O usuário confirmou **Success** na execução `43559125753` desse commit. O histórico anterior à publicação é preservado abaixo.
 
 ## Origem das evidências
 
@@ -8,7 +8,7 @@ Base externa fornecida pelo usuário, anterior a esta alteração: commit 29fe1c
 
 ## Fechamento externo da Entrega A
 
-Após a implementação e as verificações locais registradas abaixo, o usuário executou a validação fora do sandbox e confirmou os resultados a seguir. São **evidências externas fornecidas pelo usuário**, não comandos ou testes executados pelo Codex nesta atualização documental.
+Após a implementação e as verificações locais registradas abaixo, o usuário executou a validação fora do sandbox e confirmou os resultados a seguir. A tabela registra o fechamento inicial, ainda anterior ao commit e à CI; a publicação posterior está registrada na seção seguinte. São **evidências externas fornecidas pelo usuário**, não comandos ou testes executados pelo Codex nesta atualização documental.
 
 | Verificação externa | Resultado confirmado pelo usuário |
 |---|---|
@@ -28,7 +28,13 @@ Após a implementação e as verificações locais registradas abaixo, o usuári
 | Commit e publicação | Nenhum commit ou push da Entrega A realizado |
 | GitHub Actions da Entrega A | **Ainda não executado**; o Success da execução 43439337019 pertence à Etapa 3 |
 
-A aprovação externa dos 151 testes inclui os 49 casos SQL que não puderam executar suas asserções no sandbox. Ela comprova a suíte no ambiente externo utilizado, incluindo migrations, constraints, permissões, concorrência, rollback e replay. Não implica execução de nova CI nem elimina as limitações históricas de acesso do Codex ao Docker.
+A aprovação externa dos 151 testes inclui os 49 casos SQL que não puderam executar suas asserções no sandbox. Ela comprova a suíte no ambiente externo utilizado, incluindo migrations, constraints, permissões, concorrência, rollback e replay. Naquele fechamento ainda não havia execução da CI da Entrega A; a confirmação posterior está registrada abaixo. Esses resultados não eliminam as limitações históricas de acesso do Codex ao Docker.
+
+## Publicação posterior confirmada pelo usuário
+
+Depois do fechamento inicial, o usuário confirmou a publicação da Entrega A no commit **5a13762 — feat: implement financial accounts and idempotent creation** e o resultado **Success** do GitHub Actions **43559125753**. A pendência histórica de publicação/CI foi resolvida. O Codex não executou esse workflow nem realizou commit ou push nesta revisão.
+
+Essas evidências pertencem ao código publicado. A manutenção posterior de clareza e organização está registrada em [refatoração de legibilidade](refatoracao-legibilidade.md), sem alterar o escopo funcional da Entrega A e sem atribuir a ela a aprovação remota do commit anterior.
 
 ## Histórico das verificações do Codex no sandbox
 
@@ -139,11 +145,11 @@ Os critérios de conclusão da Entrega A foram atendidos na validação externa 
 
 As pendências anteriores de SQL/Compose/HTTPS foram resolvidas pelo usuário no ambiente externo, incluindo a aprovação dos testes de colisão idempotente. A migration foi escrita manualmente com target congelado, conferida offline e aplicada externamente; não foi gerada por ferramenta EF nem aplicada pelo Codex. A classificação de mensagens SQL em outros idiomas continua uma consideração de portabilidade, sem falha relatada no ambiente validado. A limitação de acesso ao Engine dentro do sandbox é preservada como histórico, sem impedir o reconhecimento dos resultados externos.
 
-Pendências de publicação: revisão do conjunto de alterações, futuro commit/push somente mediante autorização e execução do GitHub Actions da Entrega A após publicação. **Não há resultado de CI aprovado para esta entrega.** Isso não autoriza iniciar B/C ou a Etapa 5.
+No fechamento inicial, revisão, publicação e CI estavam pendentes. Essas pendências da Entrega A foram posteriormente resolvidas pelo usuário, com o commit `5a13762` e a execução `43559125753` aprovada. Isso não autoriza iniciar B/C ou a Etapa 5 nem comprova alterações posteriores.
 
 Entregas B/C e Etapa 5 não foram iniciadas. Não há PUT/PATCH/DELETE de contas, Category, FinancialTransaction, saldo atual, extrato, transferência ou relatório. Durante a atuação do Codex não houve commit, push, reset de credenciais, alteração de ACL/sandbox ou aplicação de migrations no banco persistente. A aplicação da migration foi realizada externamente pelo usuário, conforme o fechamento acima.
 
-## Inventário final e revisão de segurança
+## Inventário histórico da implementação e revisão de segurança
 
 11 arquivos existentes modificados:
 
@@ -190,4 +196,4 @@ tests/FinanceFlow.IntegrationTests/FinancialAccountsSqlTests.cs
 
 Verificações estáticas da implementação: git diff --check sem erros; scripts PowerShell analisados; links locais verificados; nenhum arquivo sensível/temporário visível ao Git, nenhuma ocorrência dos cinco segredos locais gerados nem blocos de chave privada nos arquivos visíveis. A migration inicial e InitialIdentityModel tiveram diff vazio. Nenhuma dependência de pacote foi adicionada. Esses checks são independentes da validação SQL/HTTPS externa posterior.
 
-Nesta atualização final foram alterados somente README.md, docs/etapa-4/README.md e este documento. Código, scripts e migrations foram preservados. A revisão documental inclui referências locais, git diff --check e inspeção de arquivos visíveis ao Git; não houve execução de testes, banco, contêineres, commit ou push.
+Na atualização documental anterior à publicação foram alterados somente README.md, docs/etapa-4/README.md e este documento. Código, scripts e migrations foram preservados. A revisão documental inclui referências locais, git diff --check e inspeção de arquivos visíveis ao Git; não houve execução de testes, banco, contêineres, commit ou push.

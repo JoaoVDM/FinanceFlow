@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using FinanceFlow.Application.Accounts;
+using FinanceFlow.Application.Common;
 
 namespace FinanceFlow.Api.Authentication;
 

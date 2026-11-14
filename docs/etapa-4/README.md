@@ -1,6 +1,6 @@
 # Etapa 4 — Entrega A: contas financeiras
 
-Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, aguardando revisão e futuro commit. Foram confirmados 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas, API Docker healthy e fluxos HTTPS Development/Production aprovados. O GitHub Actions da Entrega A ainda não foi executado. A Etapa 4 completa depende das futuras Entregas B/C; nenhuma delas começou. Evidências externas, histórico do sandbox e comandos de reprodução em [validação](entrega-a-validacao.md).
+Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, publicada no commit `5a13762`. Foram confirmados 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas, API Docker healthy e fluxos HTTPS Development/Production aprovados. O usuário confirmou GitHub Actions `43559125753` com **Success** nesse commit; essa evidência externa não cobre alterações posteriores. A Etapa 4 completa depende das futuras Entregas B/C; nenhuma delas começou. Evidências externas, histórico do sandbox e comandos de reprodução em [validação](entrega-a-validacao.md).
 
 ## Decisões aprovadas e limites
 
@@ -14,7 +14,7 @@ Status: **Entrega A concluída e validada externamente pelo usuário no PowerShe
 
 ## Arquitetura implementada
 
-Domain/Accounts contém FinancialAccount e invariantes sem dependências de EF/Identity/ASP.NET. Application/Accounts contém FinancialAccountsService, calendário, usuário atual, contratos de leitura e IFinancialAccountStore. Infrastructure implementa consultas EF, configurações Fluent API, IdempotencyRecord e criação atômica. Api recebe DTOs HTTP, extrai a identidade por HttpCurrentUser e compõe respostas, sem DbContext nos controllers de contas.
+Domain/Accounts contém FinancialAccount e invariantes sem dependências de EF/Identity/ASP.NET. Application/Accounts contém FinancialAccountsService, calendário, contratos de leitura e IFinancialAccountStore. ICurrentUser fica em Application/Common, compartilhando apenas o contrato do usuário autenticado. Infrastructure implementa consultas EF, configurações Fluent API, IdempotencyRecord e criação atômica. Api recebe DTOs HTTP, extrai a identidade por HttpCurrentUser e compõe respostas, sem DbContext nos controllers de contas.
 
 TimeProvider existente é reutilizado; a criação captura um instante único e deriva dele o dia financeiro e o timestamp. FinancialCalendar tenta o identificador IANA e sua conversão Windows, falhando se não houver fuso válido. Não usa offset fixo ou relógio estático do domínio.
 
@@ -73,6 +73,6 @@ Toda busca/lista/count/replay usa UserId confiável. O middleware JWT continua c
 
 ## Próximas entregas
 
-Preparar o conjunto da Entrega A para revisão e futuro commit autorizado. Seu GitHub Actions permanece pendente de execução após publicação; o sucesso histórico da Etapa 3 não cobre esta entrega.
+A publicação da Entrega A e sua CI foram confirmadas pelo usuário. A [refatoração de legibilidade](refatoracao-legibilidade.md) é manutenção posterior, sem nova funcionalidade. Em 14/11/2026, o usuário confirmou sua validação externa: 151 testes aprovados, incluindo integração SQL com Testcontainers, auditoria posterior sem pacotes vulneráveis nos sete projetos e git diff --check aprovado. Os três avisos NU1900 da execução dos testes e as limitações históricas do sandbox foram preservados; não se afirma novo build sem esses avisos. Revisar essa manutenção antes de um futuro commit autorizado; não foi informado novo resultado de CI para a refatoração.
 
 B: categorias com política já aprovada. C: alterações/atividade, If-Match e testes adicionais de escrita concorrente. Nenhum endpoint dessas entregas foi antecipado; seu início exige autorização específica. FinancialTransaction, saldo atual, transferências, extratos e relatórios continuam nas etapas posteriores.
