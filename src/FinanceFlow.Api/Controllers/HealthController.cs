@@ -29,6 +29,9 @@ public sealed class HealthController : ControllerBase
             await db.Users.AsNoTracking().OrderBy(x => x.Id)
                 .Select(x => new { x.Id, x.NormalizedEmail, x.IsActive, x.TokenVersion })
                 .Take(1).ToListAsync(cancellationToken);
+            // Readiness also requires access to the new financial objects, including an empty database.
+            await db.FinancialAccounts.AsNoTracking().OrderBy(x => x.Id).Select(x => x.Id).Take(1).ToListAsync(cancellationToken);
+            await db.IdempotencyRecords.AsNoTracking().OrderBy(x => x.Id).Select(x => x.Id).Take(1).ToListAsync(cancellationToken);
             return Ok(new HealthResponse("ready"));
         }
         catch (Exception exception) when (exception is System.Data.Common.DbException or InvalidOperationException or TimeoutException)

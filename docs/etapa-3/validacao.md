@@ -1,6 +1,12 @@
 # Etapa 3 — Identidade, autenticação e persistência
 
-Status: **Etapa 3 implementada e validada funcionalmente no PowerShell externo, conforme resultados comprovados e informados pelo usuário**. A revisão final corrigiu CS8602 e a ordenação do readiness; seu build local passou sem avisos. A repetição dos testes SQL e HTTP depois dessas duas correções permanece pendente antes do commit, pois o sandbox continua sem acesso ao Docker Engine. As evidências externas e as verificações do Codex são discriminadas abaixo; os bloqueios anteriores foram preservados como histórico.
+Status: **Etapa 3 concluída, validada externamente e publicada no commit 29fe1c0**, conforme evidências fornecidas pelo usuário. A sequência abaixo preserva o histórico de implementação e de bloqueios do Codex; suas pendências anteriores à publicação foram posteriormente resolvidas na execução externa. Os resultados desta etapa não devem ser apresentados como validação das alterações da Etapa 4.
+
+## Fechamento externo posterior à revisão e publicação
+
+Depois das correções finais de CS8602 e ordenação do readiness, o usuário confirmou: build Release de sete projetos sem erros ou warnings; 73 testes aprovados, sem falhas; 22 verificações HTTPS Development aprovadas; três verificações Production aprovadas (readiness 200, OpenAPI 404, Swagger 404). Confirmou também Docker, SQL Server, migrations e permissões validados, commit 29fe1c0 publicado em main e GitHub Actions 43439337019 com resultado Success.
+
+Essas evidências são do usuário, não execuções do Codex durante a Entrega A. A rodada externa anterior à revisão, os 46 testes locais aprovados/27 bloqueados e as tentativas antigas de restore permanecem abaixo como registros cronológicos. A depreciação de Node.js 20 nas actions é manutenção posterior; não motivou mudanças nesta entrega.
 
 ## Validação externa informada pelo usuário
 
@@ -487,4 +493,4 @@ Os arquivos locais de secrets, certificados, caches e evidências ignorados não
 
 [EF Core SQL Server](https://learn.microsoft.com/en-us/ef/core/providers/sql-server/), [Identity 10.0.13](https://www.nuget.org/packages/Microsoft.AspNetCore.Identity.EntityFrameworkCore/10.0.13), [JWT bearer](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/configure-jwt-bearer-authentication?view=aspnetcore-10.0) e [Testcontainers.MsSql](https://dotnet.testcontainers.org/modules/mssql/). Identity/JWT/EF Core permanecem em 10.0.13; SqlClient está configurado em 6.1.8 pela correção de segurança acima; Testcontainers.MsSql permanece em 4.16.0. A restauração final é necessária para confirmar todo o grafo.
 
-Pendências atuais: repetir a suíte SQL e as verificações HTTPS após os dois ajustes da revisão final; confirmar ausência do warning EF em execução; revisar o patch da imagem SQL antes de exposição pública; executar a nova CI somente após publicação autorizada. Não há novas decisões financeiras, alteração de ADR aprovado, contas, categorias, lançamentos, saldos ou relatórios. Os bloqueios antigos preservados como histórico não anulam os resultados externos fornecidos pelo usuário.
+Pendências registradas antes da publicação: repetição SQL/HTTPS, confirmação dos warnings e CI. Esses itens foram concluídos externamente pelo usuário conforme o fechamento acima. A revisão do patch da imagem SQL antes de exposição pública permanece uma consideração operacional. As alterações posteriores de contas pertencem à documentação da Etapa 4; não são retroativamente cobertas pelos resultados históricos desta etapa.

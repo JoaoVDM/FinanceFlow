@@ -2,15 +2,21 @@ using FinanceFlow.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using FinanceFlow.Domain.Accounts;
+using FinanceFlow.Infrastructure.Persistence.Accounts;
 
 namespace FinanceFlow.Infrastructure.Persistence;
 
 public sealed class FinanceFlowDbContext(DbContextOptions<FinanceFlowDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
+    public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.ApplyConfiguration(new FinancialAccountConfiguration());
+        builder.ApplyConfiguration(new IdempotencyRecordConfiguration());
         builder.Entity<IdentityUserLogin<Guid>>().Property(x => x.LoginProvider).HasMaxLength(128);
         builder.Entity<IdentityUserLogin<Guid>>().Property(x => x.ProviderKey).HasMaxLength(128);
         builder.Entity<IdentityUserToken<Guid>>().Property(x => x.LoginProvider).HasMaxLength(128);

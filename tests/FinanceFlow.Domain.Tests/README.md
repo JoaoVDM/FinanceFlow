@@ -1,3 +1,3 @@
 # Testes de domínio
 
-Projeto xUnit preparado para as regras introduzidas nas etapas financeiras. Ainda não há entidades ou regras no Domain, portanto não há casos artificiais para executar nesta etapa. Os testes efetivos da fundação estão em FinanceFlow.IntegrationTests.
+Testes xUnit das invariantes de FinancialAccount: tipos aprovados, nome, BRL, limites assinados, centavos, abertura e imutabilidade. A tolerância temporária ao código 8 foi removida. Não há banco, HTTP ou regras de lançamentos financeiros neste projeto.

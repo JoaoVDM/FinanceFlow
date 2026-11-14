@@ -4,9 +4,9 @@ API REST de gestão financeira pessoal desenvolvida como portfólio profissional
 
 ## Estado do projeto
 
-Etapas 1 e 2 concluídas: arquitetura aprovada, sete projetos, 14 testes de fundação e 16 verificações HTTP em Kestrel. Evidências históricas em [docs/etapa-2](docs/etapa-2/validacao.md). **Etapa 3 implementada e validada externamente pelo usuário: 73 testes aprovados, 22 verificações HTTPS Development, SQL healthy, migration e permissões aprovadas, documentação indisponível em Production.** A revisão final corrigiu dois warnings; seu build local passou com 0 avisos e 0 erros. A regressão SQL/HTTP após esses ajustes ainda precisa ser repetida externamente antes do commit. Resultados e origem de cada evidência em [docs/etapa-3](docs/etapa-3/validacao.md).
+Etapas 1, 2 e 3 concluídas e publicadas. O usuário confirmou, após as últimas correções, build de sete projetos sem erros/warnings, 73 testes aprovados, 22 verificações HTTPS Development, três Production e GitHub Actions 43439337019 com Success no commit 29fe1c0. São evidências externas, registradas em [docs/etapa-3](docs/etapa-3/validacao.md).
 
-O código da Etapa 3 acrescenta Identity, JWT, EF Core, SQL Server e Docker. A auditoria NuGet externa não identificou pacotes vulneráveis. Não há entidades financeiras, contas, categorias, transações ou relatórios implementados. Esta API é uma demonstração de portfólio, sem prontidão operacional de produto financeiro público.
+A Entrega A da Etapa 4 está concluída e validada externamente pelo usuário: 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas e API Docker healthy. Os scripts HTTPS de identidade (22 verificações) e contas passaram; em Production, readiness respondeu 200 e OpenAPI/Swagger 404. Código e documentação aguardam revisão e futuro commit; o GitHub Actions da Entrega A ainda não foi executado. A Etapa 4 completa depende de B/C, ainda não iniciadas. Veja [escopo](docs/etapa-4/README.md) e [evidências externas e histórico do sandbox](docs/etapa-4/entrega-a-validacao.md). Esta API é um portfólio, sem prontidão operacional de produto financeiro público.
 
 ## Requisitos e instalação
 
@@ -51,7 +51,7 @@ docker compose up -d api
 
 Os serviços de ferramentas têm perfil próprio e são acionados explicitamente. O segundo provisionamento concede acesso aos objetos após a migration. Não há migration automática no startup da API. Nenhum passo apaga volumes ou redefine senhas de logins já existentes.
 
-O SQL usa um volume nomeado e porta `127.0.0.1:14333`; a API usa o host interno `sqlserver`, nunca sa. Há três identidades separadas: administrador apenas no provisionamento, FinanceFlowMigrator para DDL e FinanceFlowApi para SELECT/INSERT/UPDATE em AspNetUsers e SELECT em __EFMigrationsHistory. A API não recebe DELETE, DDL ou credenciais administrativas. O provisionamento rejeita uma conta de API com privilégios excessivos, sem remover permissões existentes silenciosamente.
+O SQL usa um volume nomeado e porta `127.0.0.1:14333`; a API usa o host interno `sqlserver`, nunca sa. Há três identidades separadas: administrador apenas no provisionamento, FinanceFlowMigrator para DDL e FinanceFlowApi para SELECT/INSERT/UPDATE em AspNetUsers, SELECT em __EFMigrationsHistory e SELECT/INSERT em FinancialAccounts/IdempotencyRecords. A API não recebe UPDATE financeiro, DELETE, DDL ou credenciais administrativas. O provisionamento rejeita privilégios excessivos, sem remover permissões existentes silenciosamente.
 
 Imagem SQL fixada: `mcr.microsoft.com/mssql/server:2022-CU22-GDR1-ubuntu-22.04`, SQL Server 2022 Developer. Tag confirmada no registro oficial e execução healthy confirmada na validação externa. A revisão da atualização de segurança mais recente continua necessária antes de exposição pública. Este pin serve ao ambiente local reproduzível, não declara a imagem atualizada para publicação. SQL usa criptografia com certificado do contêiner aceito apenas no ambiente local; em hospedagem, use validação de certificado adequada.
 
@@ -80,9 +80,21 @@ curl.exe --cacert .local/certs/api.crt https://localhost:5443/health/ready
 curl.exe --cacert .local/certs/api.crt https://localhost:5443/openapi/v1.json
 ```
 
-Com a API em Development e o schema pronto, `./scripts/Test-LocalApi.ps1` verifica healths, documentação, cadastro, login, perfil, token adulterado e revogação por senha/logout/desativação. Usa somente um usuário fictício, preservado como inativo ao final. Senhas e tokens são gerados em memória e enviados por stdin ao curl, sem imprimi-los ou passá-los como argumentos de processo. O usuário confirmou as 22 verificações na rodada externa anterior à revisão final; o Codex não as repetiu no sandbox. A sequência completa para o PowerShell externo está em [validação da Etapa 3](docs/etapa-3/validacao.md#procedimento-no-powershell-externo).
+Com a API em Development e o schema pronto, `./scripts/Test-LocalApi.ps1` verifica healths, documentação, cadastro, login, perfil, token adulterado e revogação por senha/logout/desativação. Usa somente um usuário fictício, preservado como inativo ao final. Senhas e tokens são gerados em memória e enviados por stdin ao curl, sem imprimi-los ou passá-los como argumentos de processo. O usuário confirmou as 22 verificações na Etapa 3 e novamente no fechamento externo da Entrega A; o Codex não as repetiu por HTTPS no sandbox. A sequência completa para o PowerShell externo está em [validação da Entrega A](docs/etapa-4/entrega-a-validacao.md#validação-externa).
 
-Readiness consulta conexão, migrations pendentes e colunas necessárias do usuário. A indisponibilidade do SQL não torna o liveness uma falha. Saúde é técnica e não usa `/api/v1`. Os endpoints de credenciais rejeitam HTTP; não é necessário enfraquecer a validação TLS para usar o certificado local com `--cacert`.
+Readiness consulta conexão, migrations pendentes, colunas do usuário e acesso aos objetos de contas/idempotência. A indisponibilidade do SQL não torna o liveness uma falha. Saúde é técnica e não usa `/api/v1`. Os endpoints de credenciais rejeitam HTTP; não é necessário enfraquecer a validação TLS para usar o certificado local com `--cacert`.
+
+## Contas financeiras — Entrega A
+
+| Método | Rota | Contrato |
+|---|---|---|
+| POST | /api/v1/accounts | JWT e Idempotency-Key obrigatório; 201 com JSON/Location/ETag originais no replay; 400/401/409/429/503 |
+| GET | /api/v1/accounts | JWT; filtros isActive/type; page=1, pageSize=20 (máximo 100), sort=name ou id, direction=asc ou desc |
+| GET | /api/v1/accounts/{id} | JWT; 200 com ETag forte; recurso alheio/inexistente retorna 404 |
+
+Entrada de criação: name, type, currency, openingBalance e openingDate. Tipos estritos: checking, savings, cash, other; somente BRL; saldo inicial entre -999999999999.99 e 999999999999.99 com centavos exatos; abertura não futura no calendário America/Sao_Paulo. Valores JSON não são convertidos via double/float, e precisão excessiva não pode apagar frações. Usuário e timestamps não são aceitos no corpo. Contas inativas são incluídas por padrão. Não há PUT/PATCH, categorias ou saldo atual nesta entrega.
+
+Na preparação de um ambiente, aplique explicitamente a migration incremental 20261114000100_AccountsDeliveryA e repita o provisionamento para conceder SELECT/INSERT nas novas tabelas. A API não recebe UPDATE/DELETE nelas e não executa migrations no startup. O usuário confirmou essa sequência e o fluxo HTTPS de `./scripts/Test-LocalAccounts.ps1` no fechamento da Entrega A; o Codex não executou o [procedimento externo](docs/etapa-4/entrega-a-validacao.md#validação-externa) no banco persistente. O script preserva os registros e desativa somente o usuário fictício que criou, sem imprimir tokens/senhas.
 
 ## Endpoints de identidade
 
@@ -125,8 +137,8 @@ O framework registra Data Protection com a autenticação, mas as funcionalidade
 FinanceFlow.slnx
 src/
   FinanceFlow.Api/              HTTP, controllers, erros, OpenAPI e composição
-  FinanceFlow.Application/      Contratos de casos de uso e regras de entrada de identidade
-  FinanceFlow.Domain/           Futuramente, entidades e invariantes
+  FinanceFlow.Application/      Casos de uso de contas, proprietário e contratos de identidade
+  FinanceFlow.Domain/           FinancialAccount e invariantes financeiras
   FinanceFlow.Infrastructure/   Identity, EF Core, JWT e operações explícitas de banco
 tests/
   FinanceFlow.Domain.Tests/
@@ -136,6 +148,7 @@ docs/
   etapa-1/                     Planejamento aprovado e sete ADRs
   etapa-2/                     Implementação e evidências da fundação
   etapa-3/                     Identidade, evidências externas e revisão final
+  etapa-4/                     Entrega A: contas, idempotência e evidências de validação
 ```
 
 Referências: Api → Application/Infrastructure; Application → Domain; Infrastructure → Application/Domain; Domain sem referências de projeto ou pacotes de infraestrutura. Os projetos sem funcionalidades permanecem sem classes artificiais. Não há CQRS completo, MediatR, repositório genérico ou mapeamento automático.
@@ -144,12 +157,12 @@ Referências: Api → Application/Infrastructure; Application → Domain; Infras
 
 Tratamento global de exceções e Problem Details em todos os ambientes. Respostas de erro incluem status, title, instance, code e traceId; validação acrescenta errors. Stack traces e mensagens internas de exceção não são retornadas ao cliente. Erros são registrados no servidor; não registrar credenciais/corpos sensíveis quando as próximas funcionalidades forem adicionadas.
 
-Os testes usam xUnit e Microsoft.Testing.Platform no .NET 10. Application.Tests possui casos reais de validação de entradas; sua tolerância ao código 8 foi removida. Domain.Tests ainda não tem entidades/regras financeiras, mantendo temporariamente essa tolerância. IntegrationTests preserva a fundação e acrescenta autenticação, configurações, autorização e SQL Server real com Testcontainers.MsSql. Não há EF InMemory ou SQLite. Fixtures geram senhas e chaves efêmeras em memória e criam bancos isolados; indisponibilidade do Docker falha os testes obrigatórios, sem skip/fallback. Os controllers de falha/política negada existem somente no assembly de teste.
+Os testes usam xUnit e Microsoft.Testing.Platform no .NET 10. Domain.Tests cobre contas; Application.Tests cobre identidade e casos de uso financeiros. Nenhum projeto tolera mais código 8 por ausência de testes. IntegrationTests preserva a fundação/identidade e acrescenta contas, parsing exato, modelo/migration, idempotência e SQL Server real com Testcontainers.MsSql. Não há EF InMemory ou SQLite. Fixtures geram credenciais efêmeras e bancos isolados; indisponibilidade do Docker falha os testes obrigatórios, sem skip/fallback. Controllers técnicos de falha existem somente no assembly de teste.
 
-O workflow em .github/workflows/build.yml verifica Docker e executa restore, build e toda a suíte, incluindo SQL. Nenhum segredo real é versionado ou exigido da máquina do runner. O sucesso anterior da CI da fundação não prova o sucesso desta alteração; a nova CI só poderá ser verificada após publicação autorizada.
+O workflow em .github/workflows/build.yml verifica Docker e executa restore, build e toda a suíte, incluindo SQL. Não exige segredos reais da máquina do runner. A CI da Etapa 3 foi aprovada conforme evidência do usuário; a CI das alterações da Entrega A ainda não foi publicada/executada remotamente.
 
 ## Próximos passos
 
-Repetir os 73 testes e as 22 verificações HTTPS externamente após os ajustes de nulabilidade da fixture e ordenação do readiness, antes de preparar o commit. O build local desta revisão passou sem avisos; os testes SQL continuam bloqueados pelo acesso ao Docker dentro do sandbox. A nova CI aguarda publicação autorizada. A Etapa 4 não foi iniciada. Veja [roadmap](docs/etapa-1/backlog-e-roadmap.md), [contratos planejados](docs/etapa-1/contratos-rest.md) e [pendências](docs/etapa-1/riscos-e-referencias.md).
+Revisar o conjunto validado da Entrega A para futuro commit e publicação autorizados. Seu GitHub Actions ainda precisa ser executado após publicação; não há aprovação de CI desta entrega. As Entregas B/C e a Etapa 5 não foram iniciadas. Normalização de categorias já aprovada (Trim/NFC/ToUpperInvariant, acentos significativos e comparação binária) está registrada para B, sem entidade ou endpoints antecipados. Veja [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
 
 Licença MIT é a proposta registrada para a preparação da release; nenhum arquivo de licença foi incluído nesta etapa. Resultados de testes e prontidão devem ser avaliados pelas evidências, sem badges de sucesso não verificados.

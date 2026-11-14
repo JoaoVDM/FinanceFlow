@@ -87,6 +87,16 @@ public static class DatabaseTasks
                     SET @grant = N'GRANT SELECT ON OBJECT::dbo.__EFMigrationsHistory TO ' + QUOTENAME(@username);
                     EXEC(@grant);
                   END
+                  IF OBJECT_ID(N'dbo.FinancialAccounts') IS NOT NULL
+                  BEGIN
+                    SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.FinancialAccounts TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
+                  END
+                  IF OBJECT_ID(N'dbo.IdempotencyRecords') IS NOT NULL
+                  BEGIN
+                    SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.IdempotencyRecords TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
+                  END
                 END
                 """;
             user.Parameters.AddWithValue("@username", identity.UserID);
@@ -121,6 +131,9 @@ public static class DatabaseTasks
                     OR (class = 1 AND minor_id = 0
                       AND major_id = COALESCE(OBJECT_ID('dbo.AspNetUsers'), -1)
                       AND permission_name IN ('SELECT', 'INSERT', 'UPDATE'))
+                    OR (class = 1 AND minor_id = 0
+                      AND major_id IN (COALESCE(OBJECT_ID('dbo.FinancialAccounts'), -1), COALESCE(OBJECT_ID('dbo.IdempotencyRecords'), -1))
+                      AND permission_name IN ('SELECT', 'INSERT'))
                     OR (class = 1 AND minor_id = 0
                       AND major_id = COALESCE(OBJECT_ID('dbo.__EFMigrationsHistory'), -1)
                       AND permission_name = 'SELECT')))))
