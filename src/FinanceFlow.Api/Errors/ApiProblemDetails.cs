@@ -17,6 +17,8 @@ internal static class ApiProblemDetails
             401 => "unauthorized",
             403 => "forbidden",
             409 => "conflict",
+            412 => "precondition_failed",
+            428 => "precondition_required",
             413 => "payload_too_large",
             429 => "rate_limit_exceeded",
             503 => "service_unavailable",
@@ -41,7 +43,8 @@ internal static class ApiProblemDetails
         Customize(problem, context);
         if (await service.TryWriteAsync(new ProblemDetailsContext
         {
-            HttpContext = context, ProblemDetails = problem
+            HttpContext = context,
+            ProblemDetails = problem
         })) return;
         // An incompatible Accept header must not fall through to a developer exception page.
         await context.Response.WriteAsJsonAsync(problem, options: (JsonSerializerOptions?)null,

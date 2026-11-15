@@ -1,4 +1,5 @@
 using FinanceFlow.Api.Contracts.Accounts;
+using FinanceFlow.Api.Concurrency;
 using FinanceFlow.Application.Accounts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -85,6 +86,59 @@ public sealed class AccountsController(FinancialAccountsService accounts) : Cont
         };
     }
 
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> Update(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken)
+    {
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+
+        var result = await accounts.UpdateAsync(id, new(request.Name, request.Type), version!, cancellationToken);
+        return ChangeResponse(result);
+    }
+
+    [HttpPatch("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> SetActivity(Guid id, SetAccountActivityRequest request, CancellationToken cancellationToken)
+    {
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+
+        var result = await accounts.SetActivityAsync(id, request.IsActive!.Value, version!, cancellationToken);
+        return ChangeResponse(result);
+    }
+
+    private IActionResult ChangeResponse(AccountChangeResult result)
+    {
+        if (result.Error is { } error)
+        {
+            return Failure(error);
+        }
+
+        Response.Headers.ETag = '"' + result.Version + '"';
+        return NoContent();
+    }
+
     private IActionResult Failure(AccountFailure error)
     {
         var status = error switch
@@ -93,6 +147,7 @@ public sealed class AccountsController(FinancialAccountsService accounts) : Cont
             AccountFailure.Unauthenticated => 401,
             AccountFailure.NotFound => 404,
             AccountFailure.IdempotencyConflict => 409,
+            AccountFailure.VersionConflict => 412,
             _ => 503
         };
         if (status == 401)
@@ -106,6 +161,7 @@ public sealed class AccountsController(FinancialAccountsService accounts) : Cont
             401 => "Authentication required.",
             404 => "Resource not found.",
             409 => "The idempotency key conflicts with the original command.",
+            412 => "The resource version has changed.",
             _ => "Service unavailable."
         });
     }

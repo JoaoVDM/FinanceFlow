@@ -1,4 +1,5 @@
 using FinanceFlow.Api.Contracts.Categories;
+using FinanceFlow.Api.Concurrency;
 using FinanceFlow.Application.Categories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -74,6 +75,60 @@ public sealed class CategoriesController(CategoriesService categories) : Control
         return Ok(result.Category);
     }
 
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(409)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> Rename(Guid id, RenameCategoryRequest request, CancellationToken cancellationToken)
+    {
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+
+        var result = await categories.RenameAsync(id, new(request.Name), version!, cancellationToken);
+        return ChangeResponse(result);
+    }
+
+    [HttpPatch("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> SetActivity(Guid id, SetCategoryActivityRequest request, CancellationToken cancellationToken)
+    {
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+
+        var result = await categories.SetActivityAsync(id, request.IsActive!.Value, version!, cancellationToken);
+        return ChangeResponse(result);
+    }
+
+    private IActionResult ChangeResponse(CategoryChangeResult result)
+    {
+        if (result.Error is { } error)
+        {
+            return Failure(error);
+        }
+
+        Response.Headers.ETag = '"' + result.Version + '"';
+        return NoContent();
+    }
+
     private IActionResult Failure(CategoryFailure error)
     {
         var status = error switch
@@ -82,6 +137,7 @@ public sealed class CategoriesController(CategoriesService categories) : Control
             CategoryFailure.Unauthenticated => 401,
             CategoryFailure.NotFound => 404,
             CategoryFailure.Duplicate => 409,
+            CategoryFailure.VersionConflict => 412,
             _ => 503
         };
         if (status == 401)
@@ -95,6 +151,7 @@ public sealed class CategoriesController(CategoriesService categories) : Control
             401 => "Authentication required.",
             404 => "Resource not found.",
             409 => "A category with this name and kind already exists.",
+            412 => "The resource version has changed.",
             _ => "Service unavailable."
         });
     }

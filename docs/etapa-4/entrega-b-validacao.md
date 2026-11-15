@@ -2,7 +2,7 @@
 
 ## Estado e origem das evidências
 
-Implementação local de criação e consulta de categorias, sem Entrega C ou Etapa 5. **Validação externa confirmada pelo usuário em 14/11/2026: 216 testes aprovados, incluindo integração SQL Server/Testcontainers, e auditoria dos sete projetos sem vulnerabilidades conhecidas nas fontes consultadas.** A Entrega B ainda não foi publicada nem validada por nova execução do GitHub Actions. O build do Codex com avisos NU1900 e o histórico do sandbox permanecem registrados abaixo; não se afirma novo build totalmente sem warnings.
+Implementação local de criação e consulta de categorias, sem Entrega C ou Etapa 5. **Validação externa confirmada pelo usuário em 14/11/2026: 216 testes aprovados, incluindo integração SQL Server/Testcontainers, e auditoria dos sete projetos sem vulnerabilidades conhecidas nas fontes consultadas.** A publicação posterior de B foi confirmada pelo usuário no commit `64b32d3`, com GitHub Actions `43642389840 — Success`, conforme fechamento abaixo. O build do Codex com avisos NU1900 e o histórico do sandbox permanecem registrados abaixo; não se afirma novo build totalmente sem warnings.
 
 Workspace inicial: C:\FinanceFlow, `main` limpa em **9c938c8 — refactor: improve code readability and maintainability**. O usuário confirmou a CI **43564544104 — Success** e as validações anteriores dos 151 testes para essa baseline. São evidências externas do código anterior, não execuções do Codex nem aprovação da Entrega B.
 
@@ -122,7 +122,13 @@ Em **14/11/2026**, o usuário confirmou os resultados abaixo no PowerShell local
 
 A regressão completa e a auditoria NuGet não estão mais pendentes. A consulta posterior bem-sucedida não apaga os avisos NU1900 nem comprova novo build totalmente sem warnings. As 77 falhas de infraestrutura continuam como histórico real das execuções do Codex; os casos SQL foram posteriormente aprovados pelo usuário fora do sandbox.
 
-Essas evidências dizem respeito à suíte com bancos descartáveis de Testcontainers. **Não confirmam aplicação de migrations ou provisionamento em banco persistente.** A Entrega B ainda não foi publicada e não possui nova execução de GitHub Actions validada; a CI da baseline 9c938c8 continua sendo uma evidência distinta.
+Essas evidências dizem respeito à suíte com bancos descartáveis de Testcontainers. **Não confirmam aplicação de migrations ou provisionamento em banco persistente.** No fechamento externo inicial, a publicação e a CI de B ainda estavam pendentes; foram posteriormente confirmadas na seção seguinte. A CI da baseline 9c938c8 permanece uma evidência distinta.
+
+## Publicação posterior confirmada pelo usuário
+
+O usuário confirmou a publicação de B em **64b32d3 — feat: implement financial categories** e o GitHub Actions **43642389840 — Success**. As referências anteriores a publicação/CI pendentes descrevem o fechamento anterior a esse evento. O histórico de testes, avisos e limitações do sandbox foi preservado. Não há nova evidência sobre banco persistente.
+
+Este documento registra o escopo histórico de criação/consulta da Entrega B. Edição, atividade e If-Match pertencem à [Entrega C](entrega-c-validacao.md), cuja validação não é comprovada pela CI de B.
 
 ## Procedimento de reprodução externa
 
@@ -194,8 +200,8 @@ tests/FinanceFlow.IntegrationTests/AccountInputAndModelTests.cs
 
 ## Pendências e limites
 
-- Testes SQL e auditoria NuGet concluídos externamente pelo usuário em 14/11/2026; não são mais pendências. Permanecem a revisão para publicação autorizada e uma nova execução de GitHub Actions da Entrega B. Não há confirmação de aplicação ao banco persistente nem de novo build sem NU1900.
+- Testes SQL e auditoria NuGet concluídos externamente pelo usuário em 14/11/2026; não são mais pendências. A pendência de publicação/CI de B foi posteriormente resolvida pelo usuário com 64b32d3/43642389840; isso não comprova a entrega seguinte. Não há confirmação de aplicação ao banco persistente nem de novo build sem NU1900.
 - O reconhecimento da duplicidade, seguindo o padrão restrito existente, depende do prefixo em inglês da mensagem SQL. Outro idioma falha de modo fechado, sem transformar um erro desconhecido em 409. Uma alternativa independente de idioma exige avaliação funcional própria.
 - PUT/PATCH/DELETE, renomeação, atividade, If-Match, lançamentos, saldos, transferências e relatórios não foram implementados. As considerações funcionais de erros SQL de Accounts permanecem separadas e seu código não mudou.
 
-Status final: **Entrega B implementada e validada externamente pelo usuário: 216 testes aprovados, incluindo SQL Server/Testcontainers, e sete projetos sem vulnerabilidades conhecidas na auditoria das fontes consultadas. Ainda não publicada nem validada por nova execução do GitHub Actions.** Preservados o histórico de bloqueio do Docker no sandbox e os avisos NU1900; não se afirma novo build totalmente sem warnings ou aplicação a banco persistente. Entrega C e Etapa 5 não iniciadas. Sem stage, commit ou push pelo Codex.
+Status final: **Entrega B implementada e validada externamente pelo usuário: 216 testes aprovados, incluindo SQL Server/Testcontainers, e sete projetos sem vulnerabilidades conhecidas na auditoria das fontes consultadas. Posteriormente publicada em 64b32d3, com CI 43642389840 aprovada conforme confirmação do usuário.** Preservados o histórico de bloqueio do Docker no sandbox e os avisos NU1900; não se afirma novo build totalmente sem warnings ou aplicação a banco persistente. Entrega C e Etapa 5 não iniciadas. Sem stage, commit ou push pelo Codex.

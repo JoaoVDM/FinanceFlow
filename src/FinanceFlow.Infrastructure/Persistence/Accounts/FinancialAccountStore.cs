@@ -107,6 +107,41 @@ public sealed class FinancialAccountStore(
         }
     }
 
+    public Task<FinancialAccount?> FindForUpdateAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
+        db.FinancialAccounts.SingleOrDefaultAsync(account => account.UserId == userId && account.Id == id, cancellationToken);
+
+    public async Task<AccountChangeResult> SaveUpdateAsync(
+        FinancialAccount account, byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        var entry = db.Entry(account);
+        if (entry.State == EntityState.Detached)
+        {
+            throw new InvalidOperationException("Load the account through this store before updating it.");
+        }
+
+        // The client's version becomes the SQL UPDATE precondition, not just a memory comparison.
+        entry.Property(account => account.RowVersion).OriginalValue = expectedVersion.ToArray();
+        // Force a conditional write even for a repeated command or an unchanged test clock.
+        entry.Property(account => account.UpdatedAtUtc).IsModified = true;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            entry.State = EntityState.Detached;
+            var stillOwned = await db.FinancialAccounts.AsNoTracking()
+                .AnyAsync(current => current.Id == account.Id && current.UserId == account.UserId, cancellationToken);
+            return new(Error: stillOwned ? AccountFailure.VersionConflict : AccountFailure.NotFound);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 1205 or -2 })
+        {
+            return new(Error: AccountFailure.Unavailable);
+        }
+
+        return new(Version: Convert.ToBase64String(account.RowVersion));
+    }
+
     private static IdempotencyRecord CreateRecord(FinancialAccount account, string key, byte[] requestHash)
     {
         var snapshot = new FinancialAccountView(

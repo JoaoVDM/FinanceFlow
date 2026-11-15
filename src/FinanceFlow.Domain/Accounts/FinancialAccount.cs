@@ -46,16 +46,7 @@ public sealed class FinancialAccount
             throw new ArgumentException("An owner is required.", nameof(userId));
         }
 
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
-        {
-            throw new ArgumentException("The name must contain 1 to 100 characters.", nameof(name));
-        }
-
-        var normalizedName = name.Trim().Normalize(NormalizationForm.FormC);
-        if (normalizedName.Length is 0 or > 100)
-        {
-            throw new ArgumentException("Invalid name.", nameof(name));
-        }
+        var normalizedName = NormalizeName(name);
 
         if (!IsTypeValid(type))
         {
@@ -94,5 +85,40 @@ public sealed class FinancialAccount
             IsActive = true,
             CreatedAtUtc = createdAt.ToUniversalTime()
         };
+    }
+
+    public void UpdateDetails(string name, string type, DateTimeOffset updatedAt)
+    {
+        var normalizedName = NormalizeName(name);
+        if (!IsTypeValid(type))
+        {
+            throw new ArgumentException("Invalid account type.", nameof(type));
+        }
+
+        Name = normalizedName;
+        Type = type;
+        UpdatedAtUtc = updatedAt.ToUniversalTime();
+    }
+
+    public void SetActivity(bool isActive, DateTimeOffset updatedAt)
+    {
+        IsActive = isActive;
+        UpdatedAtUtc = updatedAt.ToUniversalTime();
+    }
+
+    private static string NormalizeName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
+        {
+            throw new ArgumentException("The name must contain 1 to 100 characters.", nameof(name));
+        }
+
+        var normalizedName = name.Trim().Normalize(NormalizationForm.FormC);
+        if (normalizedName.Length is 0 or > 100)
+        {
+            throw new ArgumentException("Invalid name.", nameof(name));
+        }
+
+        return normalizedName;
     }
 }

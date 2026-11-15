@@ -77,4 +77,47 @@ public sealed class FinancialAccountsService(
 
         return new(Page: await store.ListAsync(userId, query, cancellationToken));
     }
+
+    public Task<AccountChangeResult> UpdateAsync(
+        Guid id, UpdateAccountCommand command, byte[] expectedVersion, CancellationToken cancellationToken) =>
+        ChangeAsync(id, expectedVersion, (account, now) => account.UpdateDetails(command.Name, command.Type, now), cancellationToken);
+
+    public Task<AccountChangeResult> SetActivityAsync(
+        Guid id, bool isActive, byte[] expectedVersion, CancellationToken cancellationToken) =>
+        ChangeAsync(id, expectedVersion, (account, now) => account.SetActivity(isActive, now), cancellationToken);
+
+    private async Task<AccountChangeResult> ChangeAsync(
+        Guid id,
+        byte[] expectedVersion,
+        Action<FinancialAccount, DateTimeOffset> change,
+        CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
+        {
+            return new(Error: AccountFailure.Unauthenticated);
+        }
+
+        if (expectedVersion is not { Length: 8 })
+        {
+            return new(Error: AccountFailure.InvalidInput);
+        }
+
+        var account = await store.FindForUpdateAsync(userId, id, cancellationToken);
+        if (account is null || account.UserId != userId)
+        {
+            return new(Error: AccountFailure.NotFound);
+        }
+
+        try
+        {
+            change(account, clock.GetUtcNow());
+        }
+        catch (ArgumentException)
+        {
+            return new(Error: AccountFailure.InvalidInput);
+        }
+
+        return await store.SaveUpdateAsync(account, expectedVersion, cancellationToken);
+    }
 }

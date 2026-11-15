@@ -82,6 +82,45 @@ public sealed class CategoryStore(FinanceFlowDbContext db) : ICategoryStore
         return new(items, query.Page, query.PageSize, totalCount, totalPages);
     }
 
+    public Task<Category?> FindForUpdateAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
+        db.Categories.SingleOrDefaultAsync(category => category.UserId == userId && category.Id == id, cancellationToken);
+
+    public async Task<CategoryChangeResult> SaveUpdateAsync(
+        Category category, byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        var entry = db.Entry(category);
+        if (entry.State == EntityState.Detached)
+        {
+            throw new InvalidOperationException("Load the category through this store before updating it.");
+        }
+
+        entry.Property(category => category.RowVersion).OriginalValue = expectedVersion.ToArray();
+        // No-op requests still execute the rowversion predicate and advance the version.
+        entry.Property(category => category.UpdatedAtUtc).IsModified = true;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            entry.State = EntityState.Detached;
+            var stillOwned = await db.Categories.AsNoTracking()
+                .AnyAsync(current => current.Id == category.Id && current.UserId == category.UserId, cancellationToken);
+            return new(Error: stillOwned ? CategoryFailure.VersionConflict : CategoryFailure.NotFound);
+        }
+        catch (DbUpdateException exception) when (IsDuplicateName(exception))
+        {
+            entry.State = EntityState.Detached;
+            return new(Error: CategoryFailure.Duplicate);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 1205 or -2 })
+        {
+            return new(Error: CategoryFailure.Unavailable);
+        }
+
+        return new(Version: Convert.ToBase64String(category.RowVersion));
+    }
+
     private static bool IsDuplicateName(DbUpdateException exception) =>
         exception.Entries.Count == 1
         && exception.Entries[0].Entity is Category

@@ -204,6 +204,12 @@ public sealed class FinancialAccountsServiceTests
 
     private sealed class RecordingStore : IFinancialAccountStore
     {
+        public Task<FinancialAccount?> FindForUpdateAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<FinancialAccount?>(null);
+
+        public Task<AccountChangeResult> SaveUpdateAsync(FinancialAccount account, byte[] expectedVersion, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("This fixture covers creation and reads only.");
+
         public List<FinancialAccount> Created { get; } = [];
         public List<byte[]> Hashes { get; } = [];
         public int Calls { get; private set; }

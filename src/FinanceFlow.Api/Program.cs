@@ -67,6 +67,18 @@ if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseRouting();
 app.Use(async (context, next) =>
 {
+    if ((HttpMethods.IsPut(context.Request.Method) || HttpMethods.IsPatch(context.Request.Method))
+        && (context.Request.Path.StartsWithSegments("/api/v1/accounts")
+            || context.Request.Path.StartsWithSegments("/api/v1/categories")))
+    {
+        // Include validation, authentication and rate-limit errors, even before controller execution.
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Task.CompletedTask;
+        });
+    }
+
     // Reject HTTP for credentials; do not redirect/replay a body containing a password.
     if (context.Request.Path.StartsWithSegments("/api") && !context.Request.IsHttps)
     {

@@ -305,13 +305,19 @@ public sealed class CategoriesSqlTests(IdentitySqlFixture fixture)
         using var http = await client.GetAsync("http://localhost/api/v1/categories", TestCancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, http.StatusCode);
-        foreach (var method in new[] { HttpMethod.Put, HttpMethod.Patch, HttpMethod.Delete })
+        foreach (var method in new[] { HttpMethod.Put, HttpMethod.Patch })
         {
-            using var request = new HttpRequestMessage(method, created.Headers.Location);
+            using var request = new HttpRequestMessage(method, created.Headers.Location)
+            {
+                Content = method == HttpMethod.Put ? JsonContent.Create(new { name = "Read only" }) : JsonContent.Create(new { isActive = false })
+            };
             using var response = await client.SendAsync(request, TestCancellationToken);
 
-            Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+            Assert.Equal((HttpStatusCode)428, response.StatusCode);
         }
+
+        using var delete = await client.DeleteAsync(created.Headers.Location, TestCancellationToken);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, delete.StatusCode);
 
         using var logout = await client.PostAsync("/api/v1/auth/logout", null, TestCancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);

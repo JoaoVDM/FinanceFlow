@@ -32,17 +32,7 @@ public sealed class Category
             throw new ArgumentException("An owner is required.", nameof(userId));
         }
 
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("A category name is required.", nameof(name));
-        }
-
-        var displayName = name.Trim().Normalize(NormalizationForm.FormC);
-        var normalizedName = displayName.ToUpperInvariant().Normalize(NormalizationForm.FormC);
-        if (displayName.Length is 0 or > 100 || normalizedName.Length is 0 or > 100)
-        {
-            throw new ArgumentException("Category names must contain 1 to 100 characters after normalization.", nameof(name));
-        }
+        var (displayName, normalizedName) = NormalizeName(name);
 
         if (!IsKindValid(kind))
         {
@@ -59,5 +49,36 @@ public sealed class Category
             IsActive = true,
             CreatedAtUtc = createdAt.ToUniversalTime()
         };
+    }
+
+    public void Rename(string name, DateTimeOffset updatedAt)
+    {
+        var (displayName, normalizedName) = NormalizeName(name);
+        Name = displayName;
+        NormalizedName = normalizedName;
+        UpdatedAtUtc = updatedAt.ToUniversalTime();
+    }
+
+    public void SetActivity(bool isActive, DateTimeOffset updatedAt)
+    {
+        IsActive = isActive;
+        UpdatedAtUtc = updatedAt.ToUniversalTime();
+    }
+
+    private static (string DisplayName, string NormalizedName) NormalizeName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("A category name is required.", nameof(name));
+        }
+
+        var displayName = name.Trim().Normalize(NormalizationForm.FormC);
+        var normalizedName = displayName.ToUpperInvariant().Normalize(NormalizationForm.FormC);
+        if (displayName.Length is 0 or > 100 || normalizedName.Length is 0 or > 100)
+        {
+            throw new ArgumentException("Category names must contain 1 to 100 characters after normalization.", nameof(name));
+        }
+
+        return (displayName, normalizedName);
     }
 }

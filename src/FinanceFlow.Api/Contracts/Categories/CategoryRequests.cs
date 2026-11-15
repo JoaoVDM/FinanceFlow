@@ -35,3 +35,15 @@ public sealed class CategoryListRequest
     [FromQuery(Name = "direction")]
     public string Direction { get; init; } = "asc";
 }
+
+public sealed class RenameCategoryRequest
+{
+    [Required]
+    public string Name { get; init; } = string.Empty;
+}
+
+public sealed class SetCategoryActivityRequest
+{
+    [Required]
+    public bool? IsActive { get; init; }
+}

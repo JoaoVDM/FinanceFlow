@@ -74,8 +74,8 @@ public sealed class CategoryInputAndModelTests
             Assert.True(operation.GetProperty("security")[0].TryGetProperty("Bearer", out _));
         }
 
-        Assert.False(individual.TryGetProperty("put", out _));
-        Assert.False(individual.TryGetProperty("patch", out _));
+        Assert.True(individual.TryGetProperty("put", out _));
+        Assert.True(individual.TryGetProperty("patch", out _));
         Assert.False(individual.TryGetProperty("delete", out _));
         if (post.TryGetProperty("parameters", out var postParameters))
         {

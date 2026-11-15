@@ -35,3 +35,18 @@ public sealed class AccountListRequest
 
     public string Direction { get; init; } = "asc";
 }
+
+public sealed class UpdateAccountRequest
+{
+    [Required, StringLength(100)]
+    public string Name { get; init; } = string.Empty;
+
+    [Required]
+    public string Type { get; init; } = string.Empty;
+}
+
+public sealed class SetAccountActivityRequest
+{
+    [Required]
+    public bool? IsActive { get; init; }
+}

@@ -22,6 +22,7 @@ internal static class ApiDocumentationConfiguration
         {
             options.AddSchemaTransformer(ConfigureAccountSchemasAsync);
             options.AddSchemaTransformer(ConfigureCategorySchemasAsync);
+            options.AddSchemaTransformer(ConfigureActivitySchemasAsync);
             options.AddDocumentTransformer(ConfigureDocumentAsync);
         });
 
@@ -62,6 +63,15 @@ internal static class ApiDocumentationConfiguration
             };
         }
 
+        if (context.JsonTypeInfo.Type == typeof(UpdateAccountRequest) && schema.Properties is not null)
+        {
+            schema.Properties["type"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String,
+                Enum = [JsonValue.Create("checking"), JsonValue.Create("savings"), JsonValue.Create("cash"), JsonValue.Create("other")]
+            };
+        }
+
         return Task.CompletedTask;
     }
 
@@ -86,6 +96,7 @@ internal static class ApiDocumentationConfiguration
         ConfigureBearerRequirements(document);
         ConfigureAccountOperations(document);
         ConfigureCategoryOperations(document);
+        ConfigureFinancialChanges(document);
         return Task.CompletedTask;
     }
 
@@ -193,14 +204,18 @@ internal static class ApiDocumentationConfiguration
         OpenApiSchemaTransformerContext context,
         CancellationToken cancellationToken)
     {
-        if ((context.JsonTypeInfo.Type == typeof(CreateCategoryRequest) || context.JsonTypeInfo.Type == typeof(CategoryView))
+        if ((context.JsonTypeInfo.Type == typeof(CreateCategoryRequest) || context.JsonTypeInfo.Type == typeof(CategoryView)
+            || context.JsonTypeInfo.Type == typeof(RenameCategoryRequest))
             && schema.Properties is not null)
         {
-            schema.Properties["kind"] = new OpenApiSchema
+            if (context.JsonTypeInfo.Type != typeof(RenameCategoryRequest))
             {
-                Type = JsonSchemaType.String,
-                Enum = [JsonValue.Create("income"), JsonValue.Create("expense")]
-            };
+                schema.Properties["kind"] = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.String,
+                    Enum = [JsonValue.Create("income"), JsonValue.Create("expense")]
+                };
+            }
             if (schema.Properties["name"] is OpenApiSchema name)
             {
                 name.Description = "Required, 1–100 UTF-16 code units after Trim and NFC. Normalized uppercase NFC name must also fit 100; accents are significant.";
@@ -295,6 +310,69 @@ internal static class ApiDocumentationConfiguration
                             Schema = new OpenApiSchema { Type = JsonSchemaType.String }
                         };
                     }
+                }
+            }
+        }
+    }
+
+    private static Task ConfigureActivitySchemasAsync(
+        OpenApiSchema schema,
+        OpenApiSchemaTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        if ((context.JsonTypeInfo.Type == typeof(SetAccountActivityRequest)
+            || context.JsonTypeInfo.Type == typeof(SetCategoryActivityRequest)) && schema.Properties is not null)
+        {
+            // Nullable DTOs distinguish a missing value; Required rejects null on the wire.
+            schema.Properties["isActive"] = new OpenApiSchema { Type = JsonSchemaType.Boolean };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void ConfigureFinancialChanges(OpenApiDocument document)
+    {
+        foreach (var path in new[] { "/api/v1/accounts/{id}", "/api/v1/categories/{id}" })
+        {
+            if (document.Paths is null || !document.Paths.TryGetValue(path, out var resource) || resource.Operations is null)
+            {
+                continue;
+            }
+
+            foreach (var (method, operation) in resource.Operations)
+            {
+                if (method != HttpMethod.Put && method != HttpMethod.Patch)
+                {
+                    continue;
+                }
+
+                operation.Parameters ??= [];
+                operation.Parameters.Add(new OpenApiParameter
+                {
+                    Name = "If-Match",
+                    In = ParameterLocation.Header,
+                    Required = true,
+                    Description = "One strong quoted canonical Base64 validator containing 8 rowversion bytes. Missing: 428; malformed: 400; stale: 412. No wildcard, weak tag or list. Every accepted write, including no-op, returns a new ETag.",
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.String,
+                        MinLength = 14,
+                        MaxLength = 14,
+                        Pattern = "^\"[A-Za-z0-9+/]{10}[AEIMQUYcgkosw048]=\"$"
+                    }
+                });
+                if (operation.Responses?.TryGetValue("204", out var response) == true && response is OpenApiResponse writable)
+                {
+                    writable.Headers ??= new Dictionary<string, IOpenApiHeader>();
+                    writable.Headers["ETag"] = new OpenApiHeader
+                    {
+                        Description = "New strong rowversion validator, including when the requested values were unchanged.",
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String }
+                    };
+                    writable.Headers["Cache-Control"] = new OpenApiHeader
+                    {
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("no-store")] }
+                    };
                 }
             }
         }

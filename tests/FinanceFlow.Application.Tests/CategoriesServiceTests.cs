@@ -174,6 +174,12 @@ public sealed class CategoriesServiceTests
 
     private sealed class RecordingStore : ICategoryStore
     {
+        public Task<Category?> FindForUpdateAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<Category?>(null);
+
+        public Task<CategoryChangeResult> SaveUpdateAsync(Category category, byte[] expectedVersion, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("This fixture covers creation and reads only.");
+
         public List<Category> Created { get; } = [];
         public int Calls { get; private set; }
         public Guid Owner { get; private set; }

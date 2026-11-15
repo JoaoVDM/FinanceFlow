@@ -91,6 +91,8 @@ public static class DatabaseTasks
                   BEGIN
                     SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.FinancialAccounts TO ' + QUOTENAME(@username);
                     EXEC(@grant);
+                    SET @grant = N'GRANT UPDATE ON OBJECT::dbo.FinancialAccounts (Name, Type, IsActive, UpdatedAtUtc) TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
                   END
                   IF OBJECT_ID(N'dbo.IdempotencyRecords') IS NOT NULL
                   BEGIN
@@ -100,6 +102,8 @@ public static class DatabaseTasks
                   IF OBJECT_ID(N'dbo.Categories') IS NOT NULL
                   BEGIN
                     SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.Categories TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
+                    SET @grant = N'GRANT UPDATE ON OBJECT::dbo.Categories (Name, NormalizedName, IsActive, UpdatedAtUtc) TO ' + QUOTENAME(@username);
                     EXEC(@grant);
                   END
                 END
@@ -141,7 +145,14 @@ public static class DatabaseTasks
                       AND permission_name IN ('SELECT', 'INSERT'))
                     OR (class = 1 AND minor_id = 0
                       AND major_id = COALESCE(OBJECT_ID('dbo.__EFMigrationsHistory'), -1)
-                      AND permission_name = 'SELECT')))))
+                      AND permission_name = 'SELECT')
+                    OR (class = 1 AND minor_id > 0 AND permission_name = 'UPDATE'
+                      AND (
+                        (major_id = COALESCE(OBJECT_ID('dbo.FinancialAccounts'), -1)
+                          AND COL_NAME(major_id, minor_id) IN ('Name', 'Type', 'IsActive', 'UpdatedAtUtc'))
+                        OR (major_id = COALESCE(OBJECT_ID('dbo.Categories'), -1)
+                          AND COL_NAME(major_id, minor_id) IN ('Name', 'NormalizedName', 'IsActive', 'UpdatedAtUtc'))))
+                  ))))
               THEN 1 ELSE 0 END
             """;
         if (Convert.ToInt32(await check.ExecuteScalarAsync(cancellationToken)) != 0)

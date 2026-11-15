@@ -80,15 +80,20 @@ public sealed class CategoryPersistenceSqlTests(IdentitySqlFixture fixture)
             Assert.Equal(new[] { 1, 1, 0, 0, 0 }, Enumerable.Range(0, 5).Select(reader.GetInt32));
         }
 
-        foreach (var sql in new[] { "UPDATE dbo.Categories SET Name=N'Not allowed' WHERE Id=@id", "DELETE FROM dbo.Categories WHERE Id=@id" })
+        var forbiddenOperations = new[]
+        {
+            (Sql: "UPDATE dbo.Categories SET Kind='income' WHERE Id=@id", ExpectedError: 230),
+            (Sql: "DELETE FROM dbo.Categories WHERE Id=@id", ExpectedError: 229)
+        };
+        foreach (var operation in forbiddenOperations)
         {
             await using var denied = connection.CreateCommand();
-            denied.CommandText = sql;
+            denied.CommandText = operation.Sql;
             denied.Parameters.AddWithValue("@id", category.Id);
 
             var exception = await Assert.ThrowsAsync<SqlException>(() => denied.ExecuteNonQueryAsync(TestCancellationToken));
 
-            Assert.Equal(229, exception.Number);
+            Assert.Equal(operation.ExpectedError, exception.Number);
         }
 
         await using var metadata = connection.CreateCommand();

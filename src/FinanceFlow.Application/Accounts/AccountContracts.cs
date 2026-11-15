@@ -13,6 +13,10 @@ public interface IFinancialAccountStore
     Task<FinancialAccountView?> GetAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
     Task<AccountPage> ListAsync(Guid userId, AccountQuery query, CancellationToken cancellationToken);
+
+    Task<FinancialAccount?> FindForUpdateAsync(Guid userId, Guid id, CancellationToken cancellationToken);
+
+    Task<AccountChangeResult> SaveUpdateAsync(FinancialAccount account, byte[] expectedVersion, CancellationToken cancellationToken);
 }
 
 public sealed record CreateAccountCommand(
@@ -62,7 +66,8 @@ public enum AccountFailure
     Unauthenticated,
     NotFound,
     IdempotencyConflict,
-    Unavailable
+    Unavailable,
+    VersionConflict
 }
 
 public sealed record AccountCreationResult(StoredAccountCreation? Response = null, AccountFailure? Error = null);
@@ -70,3 +75,7 @@ public sealed record AccountCreationResult(StoredAccountCreation? Response = nul
 public sealed record AccountReadResult(FinancialAccountView? Account = null, AccountFailure? Error = null);
 
 public sealed record AccountListResult(AccountPage? Page = null, AccountFailure? Error = null);
+
+public sealed record UpdateAccountCommand(string Name, string Type);
+
+public sealed record AccountChangeResult(string? Version = null, AccountFailure? Error = null);

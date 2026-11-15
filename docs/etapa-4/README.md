@@ -1,8 +1,8 @@
 # Etapa 4 — Contas e categorias
 
-Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, publicada no commit `5a13762`. Foram confirmados 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas, API Docker healthy e fluxos HTTPS Development/Production aprovados. O usuário confirmou GitHub Actions `43559125753` com **Success** nesse commit; essa evidência externa não cobre alterações posteriores. Esse é o fechamento histórico da Entrega A. A Entrega C não começou; a implementação local de B está descrita abaixo. Evidências externas, histórico do sandbox e comandos de reprodução em [validação](entrega-a-validacao.md).
+Status: **Entrega A concluída e validada externamente pelo usuário no PowerShell do Windows**, publicada no commit `5a13762`. Foram confirmados 151 testes aprovados, build de sete projetos sem erros/warnings, migration aplicada, permissões verificadas, API Docker healthy e fluxos HTTPS Development/Production aprovados. O usuário confirmou GitHub Actions `43559125753` com **Success** nesse commit; essa evidência externa não cobre alterações posteriores. Esse é o fechamento histórico da Entrega A. B foi posteriormente publicada e C está implementada e validada externamente com 311 testes aprovados, ainda sem publicação ou nova CI aprovada, conforme os registros abaixo. Evidências externas, histórico do sandbox e comandos de reprodução em [validação](entrega-a-validacao.md).
 
-## Decisões aprovadas e limites
+## Decisões e escopo histórico da Entrega A
 
 - Tipos fechados e códigos persistidos: checking, savings, cash, other. São classificações, sem juros, rendimentos, crédito ou faturas.
 - BRL; OpeningBalance decimal exato entre -999999999999.99 e 999999999999.99, inclusive zero/negativos.
@@ -71,12 +71,20 @@ Api: AspNetUsers mantém SELECT/INSERT/UPDATE; history mantém SELECT; Financial
 
 Toda busca/lista/count/replay usa UserId confiável. O middleware JWT continua conferindo IsActive/TokenVersion a cada requisição. Erros usam Problem Details sanitizado; snapshots e chaves não são logados. Nenhuma alteração no fluxo de logout/senha/revogação foi necessária.
 
-## Refatoração publicada e Entrega B local
+## Refatoração e Entrega B publicadas
 
 O usuário confirmou a publicação da refatoração em **9c938c8**, com GitHub Actions **43564544104 — Success**. As validações e limitações históricas estão em [refatoração de legibilidade](refatoracao-legibilidade.md); essa CI não comprova alterações posteriores.
 
-A Entrega B implementa Category e somente POST/GET /api/v1/categories e GET /api/v1/categories/{id}. Preserva kind imutável (income/expense), nome Trim/NFC e unicidade por usuário/tipo com Trim/NFC/ToUpperInvariant/NFC e comparação BIN2. Não exige Idempotency-Key. Inclui migration incremental, SELECT/INSERT restritos, readiness e testes SQL obrigatórios. Em **14/11/2026**, o usuário confirmou externamente **216 testes aprovados, 0 falhas e 0 ignorados**, incluindo SQL Server/Testcontainers, e auditoria com restauração bem-sucedida e sete projetos sem vulnerabilidades conhecidas nas fontes consultadas. Os avisos NU1900 dos testes e as falhas históricas de acesso ao Docker no sandbox permanecem registrados; não se afirma novo build totalmente sem warnings. A Entrega B ainda não foi publicada nem validada por nova execução de GitHub Actions, e não há confirmação de aplicação a banco persistente. Detalhes em [entrega-b-validacao](entrega-b-validacao.md).
+A Entrega B implementa Category e somente POST/GET /api/v1/categories e GET /api/v1/categories/{id}. Preserva kind imutável (income/expense), nome Trim/NFC e unicidade por usuário/tipo com Trim/NFC/ToUpperInvariant/NFC e comparação BIN2. Não exige Idempotency-Key. Inclui migration incremental, SELECT/INSERT restritos, readiness e testes SQL obrigatórios. Em **14/11/2026**, o usuário confirmou externamente **216 testes aprovados, 0 falhas e 0 ignorados**, incluindo SQL Server/Testcontainers, e auditoria com restauração bem-sucedida e sete projetos sem vulnerabilidades conhecidas nas fontes consultadas. Os avisos NU1900 dos testes e as falhas históricas de acesso ao Docker no sandbox permanecem registrados; não se afirma novo build totalmente sem warnings. Posteriormente, o usuário confirmou a publicação de B em `64b32d3` e a CI `43642389840 — Success`. Esses resultados não comprovam C nem aplicação de seus grants no banco persistente. Detalhes em [entrega-b-validacao](entrega-b-validacao.md).
+
+## Entrega C local — Edição e concorrência
+
+Implementados somente PUT/PATCH de /api/v1/accounts/{id} e /api/v1/categories/{id}. Os quatro exigem JWT/If-Match e retornam 204 sem corpo, novo ETag e no-store. Conta permite nome/tipo; categoria permite nome normalizado; PATCH aceita somente isActive. Os campos imutáveis e o snapshot idempotente de Accounts são preservados.
+
+A versão recebida é usada como OriginalValue de RowVersion no EF Core e participa do WHERE do UPDATE. UpdatedAtUtc é forçado como coluna modificada, inclusive em comandos sem mudança de valores, para garantir execução da precondição. Não há retry em conflito. O provisionamento concede UPDATE apenas nas quatro colunas editáveis de cada tabela; o verificador continua rejeitando permissões adicionais. Não houve nova migration ou alteração nos targets históricos.
+
+Após a correção das sete falhas iniciais, o usuário executou a suíte completa no PowerShell com Docker/SQL Server/Testcontainers: **311 testes aprovados, 0 falhas e 0 ignorados**. A revisão estática final dos 34 arquivos foi aprovada, sem problemas bloqueantes. O histórico de execução sem acesso ao Docker no sandbox permanece registrado, separado da validação externa. A consulta NuGet apresentou os sete projetos sem pacotes vulneráveis identificados, mas emitiu NU1900 por indisponibilidade do índice de vulnerabilidades; não constitui auditoria de segurança conclusiva. C não foi publicada e não possui nova CI aprovada. Veja [evidências, testes e procedimento de reprodução](entrega-c-validacao.md).
 
 ## Próximas entregas
 
-Revisar a Entrega B, com testes SQL e auditoria externos concluídos, antes de um futuro commit e publicação autorizados; sua nova CI ainda não foi validada. C permanece fora do escopo: alterações/atividade, If-Match e testes adicionais de escrita concorrente exigem autorização específica. FinancialTransaction, saldo atual, transferências, extratos e relatórios continuam nas etapas posteriores.
+A regressão externa da Entrega C e a revisão estática final estão aprovadas. Repetir a auditoria NuGet quando o índice de vulnerabilidades estiver disponível. Publicação e execução de CI da Entrega C dependem de autorização e validação posteriores. Não iniciar a Etapa 5. FinancialTransaction, saldos, transferências, extratos e relatórios permanecem fora do escopo.

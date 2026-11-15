@@ -9,6 +9,10 @@ public interface ICategoryStore
     Task<CategoryView?> GetAsync(Guid userId, Guid id, CancellationToken cancellationToken);
 
     Task<CategoryPage> ListAsync(Guid userId, CategoryQuery query, CancellationToken cancellationToken);
+
+    Task<Category?> FindForUpdateAsync(Guid userId, Guid id, CancellationToken cancellationToken);
+
+    Task<CategoryChangeResult> SaveUpdateAsync(Category category, byte[] expectedVersion, CancellationToken cancellationToken);
 }
 
 public sealed record CreateCategoryCommand(string Name, string Kind);
@@ -43,9 +47,14 @@ public enum CategoryFailure
     Unauthenticated,
     NotFound,
     Duplicate,
-    Unavailable
+    Unavailable,
+    VersionConflict
 }
 
 public sealed record CategoryResult(CategoryView? Category = null, CategoryFailure? Error = null);
 
 public sealed record CategoryListResult(CategoryPage? Page = null, CategoryFailure? Error = null);
+
+public sealed record RenameCategoryCommand(string Name);
+
+public sealed record CategoryChangeResult(string? Version = null, CategoryFailure? Error = null);
