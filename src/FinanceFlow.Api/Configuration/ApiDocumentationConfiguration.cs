@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using FinanceFlow.Api.Contracts.Accounts;
 using FinanceFlow.Api.Contracts.Categories;
 using FinanceFlow.Application.Categories;
+using FinanceFlow.Api.Contracts.Transactions;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -23,6 +24,7 @@ internal static class ApiDocumentationConfiguration
             options.AddSchemaTransformer(ConfigureAccountSchemasAsync);
             options.AddSchemaTransformer(ConfigureCategorySchemasAsync);
             options.AddSchemaTransformer(ConfigureActivitySchemasAsync);
+            options.AddSchemaTransformer(ConfigureTransactionSchemasAsync);
             options.AddDocumentTransformer(ConfigureDocumentAsync);
         });
 
@@ -97,6 +99,7 @@ internal static class ApiDocumentationConfiguration
         ConfigureAccountOperations(document);
         ConfigureCategoryOperations(document);
         ConfigureFinancialChanges(document);
+        ConfigureTransactionOperations(document);
         return Task.CompletedTask;
     }
 
@@ -111,6 +114,7 @@ internal static class ApiDocumentationConfiguration
             path.Key.StartsWith("/api/v1/users", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/accounts", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/categories", StringComparison.Ordinal)
+            || path.Key.StartsWith("/api/v1/transactions", StringComparison.Ordinal)
             || path.Key.EndsWith("/auth/logout", StringComparison.Ordinal));
 
         foreach (var path in protectedPaths)
@@ -177,7 +181,8 @@ internal static class ApiDocumentationConfiguration
                 foreach (var (status, response) in operation.Responses)
                 {
                     if (response is OpenApiResponse writable
-                        && (status == "201" || (status == "200" && path.Key.Contains("{id}", StringComparison.Ordinal))))
+                        && (status == "201" || (status == "200" && path.Key.Contains("{id}", StringComparison.Ordinal)
+                            && !path.Key.EndsWith("/balance", StringComparison.Ordinal))))
                     {
                         writable.Headers ??= new Dictionary<string, IOpenApiHeader>();
                         writable.Headers["ETag"] = new OpenApiHeader
@@ -309,6 +314,112 @@ internal static class ApiDocumentationConfiguration
                             Description = "Relative URL of the created category.",
                             Schema = new OpenApiSchema { Type = JsonSchemaType.String }
                         };
+                    }
+                }
+            }
+        }
+    }
+
+    private static Task ConfigureTransactionSchemasAsync(
+        OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
+    {
+        if (context.JsonTypeInfo.Type == typeof(CreateTransactionRequest) && schema.Properties is not null)
+        {
+            schema.Properties["kind"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String,
+                Enum = [JsonValue.Create("income"), JsonValue.Create("expense")]
+            };
+            schema.Properties["amount"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.Number,
+                Minimum = "0.01",
+                Maximum = "999999999999.99",
+                MultipleOf = 0.01m,
+                Description = "Positive BRL decimal with exact cents, validated before parsing; no silent rounding."
+            };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void ConfigureTransactionOperations(OpenApiDocument document)
+    {
+        if (document.Paths is null)
+        {
+            return;
+        }
+        if (document.Paths.TryGetValue("/api/v1/accounts/{id}/balance", out var balancePath)
+            && balancePath.Operations?.TryGetValue(HttpMethod.Get, out var balanceOperation) == true)
+        {
+            balanceOperation.Description = "BRL balance from opening balance and valid income/expense through inclusive asOf (yyyy-MM-dd). Default: today in America/Sao_Paulo; future rejected. Before opening: zero. Inactive accounts remain included. No persisted current balance.";
+        }
+        foreach (var (path, resource) in document.Paths.Where(path => path.Key.StartsWith("/api/v1/transactions", StringComparison.Ordinal)))
+        {
+            if (resource.Operations is null)
+            {
+                continue;
+            }
+            foreach (var (method, operation) in resource.Operations)
+            {
+                if (method == HttpMethod.Post)
+                {
+                    operation.Parameters ??= [];
+                    operation.Parameters.Add(new OpenApiParameter
+                    {
+                        Name = "Idempotency-Key",
+                        In = ParameterLocation.Header,
+                        Required = true,
+                        Description = "1–128 visible ASCII characters, case-sensitive. Replays original 201/body/Location/ETag; changed command: 409.",
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 1, MaxLength = 128, Pattern = "^[!-~]{1,128}$" }
+                    });
+                }
+
+                foreach (var parameter in operation.Parameters ?? [])
+                {
+                    if (parameter is not OpenApiParameter writableParameter)
+                    {
+                        continue;
+                    }
+                    if (parameter.Name is "MinAmount" or "minAmount" or "MaxAmount" or "maxAmount")
+                    {
+                        writableParameter.Schema = new OpenApiSchema { Type = JsonSchemaType.Number, Minimum = "0", Maximum = "999999999999.99", MultipleOf = 0.01m };
+                    }
+                    if (parameter.Name is "kind" or "sort" or "direction")
+                    {
+                        var allowed = parameter.Name switch
+                        {
+                            "kind" => new[] { "income", "expense" },
+                            "sort" => new[] { "occurredOn", "amount", "id" },
+                            _ => new[] { "asc", "desc" }
+                        };
+                        writableParameter.Schema = new OpenApiSchema
+                        {
+                            Type = JsonSchemaType.String,
+                            Enum = allowed.Select(value => (JsonNode)JsonValue.Create(value)!).ToList()
+                        };
+                    }
+                }
+
+                if (operation.Responses is null)
+                {
+                    continue;
+                }
+                foreach (var (status, response) in operation.Responses)
+                {
+                    if (response is not OpenApiResponse writable)
+                    {
+                        continue;
+                    }
+                    writable.Headers ??= new Dictionary<string, IOpenApiHeader>();
+                    writable.Headers["Cache-Control"] = new OpenApiHeader { Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("no-store")] } };
+                    if (status == "201" || (status == "200" && path.Contains("{id}", StringComparison.Ordinal)))
+                    {
+                        writable.Headers["ETag"] = new OpenApiHeader { Schema = new OpenApiSchema { Type = JsonSchemaType.String }, Description = "Strong opaque SQL rowversion validator." };
+                    }
+                    if (status == "201")
+                    {
+                        writable.Headers["Location"] = new OpenApiHeader { Schema = new OpenApiSchema { Type = JsonSchemaType.String }, Description = "Created transaction URL, preserved on replay." };
                     }
                 }
             }

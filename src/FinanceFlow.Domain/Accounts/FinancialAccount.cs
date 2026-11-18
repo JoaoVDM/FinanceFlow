@@ -5,7 +5,7 @@ namespace FinanceFlow.Domain.Accounts;
 
 public sealed class FinancialAccount
 {
-    public const decimal MaximumOpeningBalance = 999999999999.99m;
+    public const decimal MaximumOpeningBalance = Common.MonetaryLimits.MaximumAmount;
 
     private FinancialAccount()
     {

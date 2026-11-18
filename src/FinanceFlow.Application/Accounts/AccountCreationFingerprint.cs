@@ -9,8 +9,7 @@ public static class AccountCreationFingerprint
 {
     public const string Operation = "accounts.create.v1";
 
-    public static bool IsKeyValid(string? key) => key is { Length: >= 1 and <= 128 }
-        && key.All(character => character is >= '!' and <= '~');
+    public static bool IsKeyValid(string? key) => Common.IdempotencyKey.IsValid(key);
 
     // Frozen v1 canonical representation, independent of HTTP JSON property order/culture.
     public static byte[] Compute(FinancialAccount account)

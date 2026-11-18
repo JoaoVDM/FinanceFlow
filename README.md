@@ -14,6 +14,8 @@ A **Entrega B — Categorias Financeiras** está implementada e foi validada ext
 
 A **Entrega C — Edição, atividade e concorrência** está implementada e validada externamente pelo usuário no PowerShell com Docker/SQL Server/Testcontainers: **311 testes aprovados, 0 falhas e 0 ignorados**. PUT/PATCH de contas e categorias exigem If-Match forte e retornam 204 com novo ETag. Toda gravação aceita, inclusive sem mudança de valores, executa UPDATE condicionado à rowversion. Não há nova migration; a API recebe UPDATE somente nas colunas editáveis. A revisão estática final dos 34 arquivos foi aprovada, sem problemas bloqueantes. Na consulta NuGet externa, os sete projetos foram apresentados sem pacotes vulneráveis identificados, mas houve avisos NU1900 por indisponibilidade do índice de vulnerabilidades; a auditoria não é conclusiva. O histórico de bloqueio do Docker no sandbox foi preservado. A entrega permanece local, sem nova CI aprovada. Veja [evidências e procedimento externo](docs/etapa-4/entrega-c-validacao.md).
 
+A baseline da **Etapa 5A** é `76e909b`, na branch `main`: o usuário confirmou a publicação da Etapa 4, 311 testes locais aprovados e CI aprovada. Essa confirmação é posterior ao fechamento histórico acima e não comprova as alterações locais da Entrega 5A. Posteriormente, o usuário validou a suíte completa de 5A no PowerShell com Docker/SQL Server/Testcontainers: **386 testes aprovados, 0 falhas e 0 ignorados**. A revisão consolidada dos 32 arquivos foi aprovada, sem problemas bloqueantes. O histórico de Docker inacessível no sandbox foi preservado; os avisos NU1900 mantêm a auditoria de vulnerabilidades inconclusiva. Não há aprovação de CI ou publicação de 5A confirmada. Veja [escopo e evidências](docs/etapa-5/README.md).
+
 ## Requisitos e instalação
 
 - .NET SDK estável da faixa 10.0.4xx; global.json aceita patches dessa faixa, incluindo 10.0.404.
@@ -57,7 +59,7 @@ docker compose up -d api
 
 Os serviços de ferramentas têm perfil próprio e são acionados explicitamente. O segundo provisionamento concede acesso aos objetos após a migration. Não há migration automática no startup da API. Nenhum passo apaga volumes ou redefine senhas de logins já existentes.
 
-O SQL usa um volume nomeado e porta `127.0.0.1:14333`; a API usa o host interno `sqlserver`, nunca sa. Há três identidades separadas: administrador apenas no provisionamento, FinanceFlowMigrator para DDL e FinanceFlowApi para SELECT/INSERT/UPDATE em AspNetUsers, SELECT em __EFMigrationsHistory e SELECT/INSERT em FinancialAccounts/IdempotencyRecords. A API não recebe UPDATE financeiro, DELETE, DDL ou credenciais administrativas. O provisionamento rejeita privilégios excessivos, sem remover permissões existentes silenciosamente.
+O SQL usa um volume nomeado e porta `127.0.0.1:14333`; a API usa o host interno `sqlserver`, nunca sa. Há três identidades separadas: administrador apenas no provisionamento, FinanceFlowMigrator para DDL e FinanceFlowApi para SELECT/INSERT/UPDATE em AspNetUsers, SELECT em __EFMigrationsHistory e SELECT/INSERT em FinancialAccounts/Categories/IdempotencyRecords/FinancialTransactions. UPDATE financeiro permanece restrito às colunas editáveis de contas e categorias introduzidas na Entrega C. Transações e registros idempotentes não recebem UPDATE/DELETE; a API não recebe DELETE financeiro, DDL ou credenciais administrativas. O provisionamento rejeita privilégios excessivos, sem remover permissões existentes silenciosamente.
 
 Imagem SQL fixada: `mcr.microsoft.com/mssql/server:2022-CU22-GDR1-ubuntu-22.04`, SQL Server 2022 Developer. Tag confirmada no registro oficial e execução healthy confirmada na validação externa. A revisão da atualização de segurança mais recente continua necessária antes de exposição pública. Este pin serve ao ambiente local reproduzível, não declara a imagem atualizada para publicação. SQL usa criptografia com certificado do contêiner aceito apenas no ambiente local; em hospedagem, use validação de certificado adequada.
 
@@ -129,6 +131,21 @@ Contas inativas podem ser editadas; desativar não exige saldo zero. Categoria m
 
 Não há nova migration. O provisionamento passa a permitir UPDATE por coluna: FinancialAccounts (Name, Type, IsActive, UpdatedAtUtc) e Categories (Name, NormalizedName, IsActive, UpdatedAtUtc). A API mantém SELECT/INSERT e não recebe UPDATE financeiro amplo, DELETE, DDL ou UPDATE em IdempotencyRecords. O provisionamento desses grants no banco persistente não foi executado pelo Codex e depende de autorização específica. O snapshot idempotente de criação de contas não é modificado. Testes, limitações e comandos em [entrega-c-validacao](docs/etapa-4/entrega-c-validacao.md).
 
+## Transações e saldos — Entrega 5A local
+
+| Método | Rota | Contrato |
+|---|---|---|
+| POST | /api/v1/transactions | JWT e Idempotency-Key; 201, Location, ETag e snapshot preservado em replay |
+| GET | /api/v1/transactions | JWT; paginação e filtros accountId/categoryId/kind/from/to/minAmount/maxAmount |
+| GET | /api/v1/transactions/{id} | JWT; recurso próprio e ETag; alheio/inexistente retorna 404 |
+| GET | /api/v1/accounts/{id}/balance | JWT; asOf opcional, inclusivo e sem futuro; accountId/currency/asOf/balance |
+
+POST aceita somente accountId, categoryId, kind (income/expense), amount positivo com centavos exatos, occurredOn e description opcional até 500 caracteres. Conta e categoria devem ser próprias e ativas; a categoria deve ter o mesmo tipo. A data vai da abertura da conta até hoje em America/Sao_Paulo. A transação SQL RepeatableRead mantém protegidas as leituras de atividade até a gravação e o commit do snapshot idempotente. Vínculo inativo: 409; referência alheia/inexistente: 404; valor/data/tipo incompatível: 400. Não há PUT/DELETE de transações.
+
+As listas usam page=1/pageSize=20 (máximo 100), sort=occurredOn/amount/id e direction=asc/desc, com padrão occurredOn desc e desempate por Id. Datas são YYYY-MM-DD; filtros monetários são não negativos, limitados e com centavos exatos, inclusive na query string. Respostas financeiras usam no-store.
+
+O saldo é OpeningBalance + receitas válidas - despesas válidas até o corte, inclusive movimentos retroativos; antes da abertura retorna zero. Contas inativas continuam incluídas. Não há CurrentBalance persistido. A migration incremental é `20261117000100_TransactionsDelivery5A`; exige aplicação explícita e novo provisionamento SELECT/INSERT em FinancialTransactions quando houver autorização para atualizar um ambiente persistente. Nada foi aplicado ao banco persistente nesta implementação. Consulte [validações e limitações](docs/etapa-5/entrega-5a-validacao.md).
+
 ## Endpoints de identidade
 
 | Método | Rota sob /api/v1 | Corpo / acesso |
@@ -182,6 +199,7 @@ docs/
   etapa-2/                     Implementação e evidências da fundação
   etapa-3/                     Identidade, evidências externas e revisão final
   etapa-4/                     Entregas A/B, refatoração e evidências de validação
+  etapa-5/                     Entrega 5A: testes externos aprovados; auditoria NuGet inconclusiva
 ```
 
 Referências: Api → Application/Infrastructure; Application → Domain; Infrastructure → Application/Domain; Domain sem referências de projeto ou pacotes de infraestrutura. Os projetos sem funcionalidades permanecem sem classes artificiais. Não há CQRS completo, MediatR, repositório genérico ou mapeamento automático.
@@ -190,12 +208,12 @@ Referências: Api → Application/Infrastructure; Application → Domain; Infras
 
 Tratamento global de exceções e Problem Details em todos os ambientes. Respostas de erro incluem status, title, instance, code e traceId; validação acrescenta errors. Stack traces e mensagens internas de exceção não são retornadas ao cliente. Erros são registrados no servidor; não registrar credenciais/corpos sensíveis quando as próximas funcionalidades forem adicionadas.
 
-Os testes usam xUnit e Microsoft.Testing.Platform no .NET 10. Domain.Tests cobre contas e categorias; Application.Tests cobre identidade e casos de uso financeiros. Nenhum projeto tolera mais código 8 por ausência de testes. IntegrationTests preserva a fundação/identidade e acrescenta contas/categorias, parsing exato, normalização, modelo/migrations, idempotência e SQL Server real com Testcontainers.MsSql. Não há EF InMemory ou SQLite. Fixtures geram credenciais efêmeras e bancos isolados; indisponibilidade do Docker falha os testes obrigatórios, sem skip/fallback. Controllers técnicos de falha existem somente no assembly de teste.
+Os testes usam xUnit e Microsoft.Testing.Platform no .NET 10. Domain.Tests cobre contas, categorias e transações; Application.Tests cobre identidade e casos de uso financeiros. Nenhum projeto tolera mais código 8 por ausência de testes. IntegrationTests preserva a fundação/identidade e acrescenta contas/categorias/transações/saldos, parsing exato, normalização, modelo/migrations, idempotência e SQL Server real com Testcontainers.MsSql. Não há EF InMemory ou SQLite. Fixtures geram credenciais efêmeras e bancos isolados; indisponibilidade do Docker falha os testes obrigatórios, sem skip/fallback. Controllers técnicos de falha existem somente no assembly de teste.
 
 O workflow em .github/workflows/build.yml verifica Docker e executa restore, build e toda a suíte, incluindo SQL. Não exige segredos reais da máquina do runner. Conforme evidência fornecida pelo usuário, a CI da Etapa 3 foi aprovada e a Entrega A publicada em `5a13762` teve **Success** na execução `43559125753`. A refatoração publicada em `9c938c8` também teve CI `43564544104` aprovada, conforme confirmação do usuário. O usuário confirmou também a publicação de B em `64b32d3` e a CI `43642389840 — Success`. Nenhuma dessas execuções comprova a Entrega C local; seu workflow não foi disparado pelo Codex.
 
 ## Próximos passos
 
-Concluir a validação externa da Entrega C com SQL Server/Testcontainers e auditoria NuGet acessíveis, revisar o diff e só então preparar publicação autorizada. A Etapa 5 não foi iniciada. A publicação/CI de B é histórica e não substitui a validação de C. Veja [evidências da Entrega C](docs/etapa-4/entrega-c-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
+A regressão externa de 5A (386 aprovados, sem falhas ou ignorados) e a revisão técnica consolidada estão aprovadas. Repetir a auditoria NuGet quando o índice estiver disponível; os avisos NU1900 não permitem uma conclusão de segurança. Publicação e CI de 5A ainda dependem de autorização e validação posteriores. As Entregas 5B/5C e a Etapa 6 não foram iniciadas. Veja [evidências de 5A](docs/etapa-5/entrega-5a-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
 
 Licença MIT é a proposta registrada para a preparação da release; nenhum arquivo de licença foi incluído nesta etapa. Resultados de testes e prontidão devem ser avaliados pelas evidências, sem badges de sucesso não verificados.

@@ -79,6 +79,18 @@ app.Use(async (context, next) =>
         });
     }
 
+    if (context.Request.Path.StartsWithSegments("/api/v1/transactions")
+        || (HttpMethods.IsGet(context.Request.Method)
+            && context.Request.Path.StartsWithSegments("/api/v1/accounts")
+            && context.Request.Path.Value!.TrimEnd('/').EndsWith("/balance", StringComparison.OrdinalIgnoreCase)))
+    {
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Task.CompletedTask;
+        });
+    }
+
     // Reject HTTP for credentials; do not redirect/replay a body containing a password.
     if (context.Request.Path.StartsWithSegments("/api") && !context.Request.IsHttps)
     {
