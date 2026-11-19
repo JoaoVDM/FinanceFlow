@@ -323,7 +323,8 @@ internal static class ApiDocumentationConfiguration
     private static Task ConfigureTransactionSchemasAsync(
         OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
     {
-        if (context.JsonTypeInfo.Type == typeof(CreateTransactionRequest) && schema.Properties is not null)
+        if ((context.JsonTypeInfo.Type == typeof(CreateTransactionRequest) || context.JsonTypeInfo.Type == typeof(UpdateTransactionRequest))
+            && schema.Properties is not null)
         {
             schema.Properties["kind"] = new OpenApiSchema
             {
@@ -443,7 +444,7 @@ internal static class ApiDocumentationConfiguration
 
     private static void ConfigureFinancialChanges(OpenApiDocument document)
     {
-        foreach (var path in new[] { "/api/v1/accounts/{id}", "/api/v1/categories/{id}" })
+        foreach (var path in new[] { "/api/v1/accounts/{id}", "/api/v1/categories/{id}", "/api/v1/transactions/{id}" })
         {
             if (document.Paths is null || !document.Paths.TryGetValue(path, out var resource) || resource.Operations is null)
             {
@@ -452,7 +453,7 @@ internal static class ApiDocumentationConfiguration
 
             foreach (var (method, operation) in resource.Operations)
             {
-                if (method != HttpMethod.Put && method != HttpMethod.Patch)
+                if (method != HttpMethod.Put && method != HttpMethod.Patch && method != HttpMethod.Delete)
                 {
                     continue;
                 }

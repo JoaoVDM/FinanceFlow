@@ -21,6 +21,22 @@ public sealed class CreateTransactionRequest
     public string? Description { get; init; }
 }
 
+public sealed class UpdateTransactionRequest
+{
+    [Required]
+    public Guid? AccountId { get; init; }
+    [Required]
+    public Guid? CategoryId { get; init; }
+    [Required]
+    public string Kind { get; init; } = string.Empty;
+    [Required, JsonConverter(typeof(ExactMoneyJsonConverter))]
+    public decimal? Amount { get; init; }
+    [Required]
+    public DateOnly? OccurredOn { get; init; }
+    [StringLength(500)]
+    public string? Description { get; init; }
+}
+
 public sealed class TransactionListRequest
 {
     [Range(1, int.MaxValue), FromQuery(Name = "page")]

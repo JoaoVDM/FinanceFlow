@@ -121,6 +121,10 @@ public sealed class FinancialTransactionsServiceTests
     private sealed class Clock : TimeProvider { public override DateTimeOffset GetUtcNow() => Now; }
     private sealed class Store : IFinancialTransactionStore
     {
+        public Task<TransactionChangeResult> UpdateAsync(Guid userId, Guid id, TransactionDetails details, byte[] expectedVersion,
+            DateOnly today, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<TransactionChangeResult> DeleteAsync(Guid userId, Guid id, byte[] expectedVersion,
+            DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
         public int Calls { get; private set; }
         public FinancialTransaction? Created { get; private set; }
         public string? Key { get; private set; }

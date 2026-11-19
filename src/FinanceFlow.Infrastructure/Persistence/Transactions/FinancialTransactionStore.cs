@@ -79,6 +79,114 @@ public sealed class FinancialTransactionStore(FinanceFlowDbContext db, DbContext
         // Early returns or unexpected failures dispose/roll back the transaction. No partial success.
     }
 
+    public async Task<TransactionChangeResult> UpdateAsync(Guid userId, Guid id, TransactionDetails details,
+        byte[] expectedVersion, DateOnly today, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        // Load optimistically before RepeatableRead: holding shared locks on the transaction row
+        // while two editors try to upgrade them would cause deadlocks instead of rowversion conflicts.
+        var value = await FindForChangeAsync(userId, id, cancellationToken);
+        if (value is null)
+        {
+            return new(Error: TransactionFailure.NotFound);
+        }
+        if (!value.RowVersion.AsSpan().SequenceEqual(expectedVersion))
+        {
+            return new(Error: TransactionFailure.VersionConflict);
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
+        try
+        {
+            // Source and destination are read in a consistent order and stay locked until commit.
+            var accounts = await db.FinancialAccounts.AsNoTracking()
+                .Where(account => account.UserId == userId && (account.Id == value.AccountId || account.Id == details.AccountId))
+                .OrderBy(account => account.Id).ToListAsync(cancellationToken);
+            var originalAccount = accounts.SingleOrDefault(account => account.Id == value.AccountId);
+            var targetAccount = accounts.SingleOrDefault(account => account.Id == details.AccountId);
+            var category = await db.Categories.AsNoTracking()
+                .SingleOrDefaultAsync(category => category.UserId == userId && category.Id == details.CategoryId, cancellationToken);
+            if (originalAccount is null || targetAccount is null || category is null)
+            {
+                return new(Error: TransactionFailure.NotFound);
+            }
+
+            var links = value.UpdateDetails(details, originalAccount, targetAccount, category, today, now);
+            if (links != TransactionLinkStatus.Valid)
+            {
+                return new(Error: links == TransactionLinkStatus.Inactive
+                    ? TransactionFailure.InactiveReference : TransactionFailure.InvalidInput);
+            }
+
+            await SaveChangeAsync(value, expectedVersion, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new(Version: Convert.ToBase64String(value.RowVersion));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            return await ConcurrencyFailureAsync(value, cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 1205 or -2 })
+        {
+            // Disposal rolls back the whole unit, including when SQL already aborted a deadlock victim.
+            return new(Error: TransactionFailure.Unavailable);
+        }
+    }
+
+    public async Task<TransactionChangeResult> DeleteAsync(Guid userId, Guid id, byte[] expectedVersion,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var value = await FindForChangeAsync(userId, id, cancellationToken);
+        if (value is null)
+        {
+            return new(Error: TransactionFailure.NotFound);
+        }
+        if (!value.RowVersion.AsSpan().SequenceEqual(expectedVersion))
+        {
+            return new(Error: TransactionFailure.VersionConflict);
+        }
+
+        // Deletion does not validate activity or lock reference rows. Keep an explicit local unit
+        // so a failure after SaveChanges but before commit still rolls back the logical deletion.
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            value.Delete(now);
+            await SaveChangeAsync(value, expectedVersion, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new(Version: Convert.ToBase64String(value.RowVersion));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            return await ConcurrencyFailureAsync(value, cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 1205 or -2 })
+        {
+            return new(Error: TransactionFailure.Unavailable);
+        }
+    }
+
+    private Task<FinancialTransaction?> FindForChangeAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
+        db.FinancialTransactions.SingleOrDefaultAsync(value => value.UserId == userId && value.Id == id && !value.IsDeleted, cancellationToken);
+
+    private Task<int> SaveChangeAsync(FinancialTransaction value, byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        var entry = db.Entry(value);
+        // The early check only sets error precedence. This is the actual SQL write precondition.
+        entry.Property(transaction => transaction.RowVersion).OriginalValue = expectedVersion.ToArray();
+        entry.Property(transaction => transaction.UpdatedAtUtc).IsModified = true;
+        return db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<TransactionChangeResult> ConcurrencyFailureAsync(FinancialTransaction value, CancellationToken cancellationToken)
+    {
+        db.Entry(value).State = EntityState.Detached;
+        var exists = await db.FinancialTransactions.AsNoTracking()
+            .AnyAsync(current => current.Id == value.Id && current.UserId == value.UserId && !current.IsDeleted, cancellationToken);
+        return new(Error: exists ? TransactionFailure.VersionConflict : TransactionFailure.NotFound);
+    }
+
     public Task<FinancialTransactionView?> GetAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
         db.FinancialTransactions.AsNoTracking().Where(value => value.UserId == userId && value.Id == id && !value.IsDeleted)
             .Select(Projection).SingleOrDefaultAsync(cancellationToken);

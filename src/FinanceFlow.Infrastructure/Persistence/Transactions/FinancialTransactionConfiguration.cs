@@ -4,6 +4,7 @@ using FinanceFlow.Domain.Transactions;
 using FinanceFlow.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace FinanceFlow.Infrastructure.Persistence.Transactions;
 
@@ -32,6 +33,8 @@ public sealed class FinancialTransactionConfiguration : IEntityTypeConfiguration
         transaction.Property(value => value.UpdatedAtUtc).HasColumnType("datetimeoffset");
         transaction.Property(value => value.DeletedAtUtc).HasColumnType("datetimeoffset");
         transaction.Property(value => value.RowVersion).IsRowVersion().IsRequired();
+        transaction.Property(value => value.UserId).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        transaction.Property(value => value.CreatedAtUtc).Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
         transaction.HasIndex(value => new { value.UserId, value.AccountId, value.OccurredOn, value.Id });
         transaction.HasIndex(value => new { value.UserId, value.CategoryId, value.OccurredOn });
         transaction.HasIndex(value => new { value.UserId, value.OccurredOn, value.Id });

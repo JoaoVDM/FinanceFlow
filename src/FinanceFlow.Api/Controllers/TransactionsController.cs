@@ -2,9 +2,11 @@ using System.Text.Json;
 using System.Globalization;
 using FinanceFlow.Api.Contracts.Accounts;
 using FinanceFlow.Api.Contracts.Transactions;
+using FinanceFlow.Api.Concurrency;
 using FinanceFlow.Application.Transactions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace FinanceFlow.Api.Controllers;
 
@@ -109,12 +111,70 @@ public sealed class TransactionsController(FinancialTransactionsService transact
         return result.Error is { } error ? Failure(error) : Ok(result.Page);
     }
 
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(409)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> Update(Guid id, UpdateTransactionRequest request, CancellationToken cancellationToken)
+    {
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+        var result = await transactions.UpdateAsync(id, new(request.AccountId!.Value, request.CategoryId!.Value,
+            request.Kind, request.Amount!.Value, request.OccurredOn!.Value, request.Description), version!, cancellationToken);
+        return ChangeResponse(result);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        // This financial DELETE has no request DTO; do not silently accept attempted field updates.
+        if (HttpContext.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true || Request.ContentLength > 0)
+        {
+            return Problem(statusCode: 400);
+        }
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+        var result = await transactions.DeleteAsync(id, version!, cancellationToken);
+        return ChangeResponse(result);
+    }
+
+    private IActionResult ChangeResponse(TransactionChangeResult result)
+    {
+        if (result.Error is { } error)
+        {
+            return Failure(error);
+        }
+        Response.Headers.ETag = '"' + result.Version + '"';
+        return NoContent();
+    }
+
     private IActionResult Failure(TransactionFailure error) => Problem(statusCode: error switch
     {
         TransactionFailure.InvalidInput => 400,
         TransactionFailure.Unauthenticated => 401,
         TransactionFailure.NotFound => 404,
         TransactionFailure.InactiveReference or TransactionFailure.IdempotencyConflict => 409,
+        TransactionFailure.VersionConflict => 412,
         _ => 503
     });
 }

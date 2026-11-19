@@ -89,7 +89,7 @@ public sealed class TransactionInputAndModelTests
         var collection = paths.GetProperty("/api/v1/transactions");
         var individual = paths.GetProperty("/api/v1/transactions/{id}");
         Assert.Equal(new[] { "get", "post" }, collection.EnumerateObject().Select(value => value.Name).Order());
-        Assert.Equal(new[] { "get" }, individual.EnumerateObject().Select(value => value.Name));
+        Assert.Equal(new[] { "delete", "get", "put" }, individual.EnumerateObject().Select(value => value.Name).Order());
         foreach (var operation in new[] { collection.GetProperty("post"), collection.GetProperty("get"), individual.GetProperty("get"),
             paths.GetProperty("/api/v1/accounts/{id}/balance").GetProperty("get") })
         {

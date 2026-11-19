@@ -110,6 +110,8 @@ public static class DatabaseTasks
                   BEGIN
                     SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.FinancialTransactions TO ' + QUOTENAME(@username);
                     EXEC(@grant);
+                    SET @grant = N'GRANT UPDATE ON OBJECT::dbo.FinancialTransactions (AccountId, CategoryId, Kind, Amount, OccurredOn, Description, UpdatedAtUtc, IsDeleted, DeletedAtUtc) TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
                   END
                 END
                 """;
@@ -156,7 +158,9 @@ public static class DatabaseTasks
                         (major_id = COALESCE(OBJECT_ID('dbo.FinancialAccounts'), -1)
                           AND COL_NAME(major_id, minor_id) IN ('Name', 'Type', 'IsActive', 'UpdatedAtUtc'))
                         OR (major_id = COALESCE(OBJECT_ID('dbo.Categories'), -1)
-                          AND COL_NAME(major_id, minor_id) IN ('Name', 'NormalizedName', 'IsActive', 'UpdatedAtUtc'))))
+                          AND COL_NAME(major_id, minor_id) IN ('Name', 'NormalizedName', 'IsActive', 'UpdatedAtUtc'))
+                        OR (major_id = COALESCE(OBJECT_ID('dbo.FinancialTransactions'), -1)
+                          AND COL_NAME(major_id, minor_id) IN ('AccountId', 'CategoryId', 'Kind', 'Amount', 'OccurredOn', 'Description', 'UpdatedAtUtc', 'IsDeleted', 'DeletedAtUtc'))))
                   ))))
               THEN 1 ELSE 0 END
             """;

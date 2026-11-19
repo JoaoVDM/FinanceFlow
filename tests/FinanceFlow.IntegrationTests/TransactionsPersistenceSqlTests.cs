@@ -76,13 +76,18 @@ public sealed class TransactionsPersistenceSqlTests(IdentitySqlFixture fixture)
             Assert.True(await reader.ReadAsync(Cancellation));
             Assert.Equal(new[] { 1, 1, 0, 0, 0 }, Enumerable.Range(0, 5).Select(reader.GetInt32));
         }
-        foreach (var sql in new[] { "UPDATE dbo.FinancialTransactions SET Amount=Amount WHERE Id=@id", "DELETE FROM dbo.FinancialTransactions WHERE Id=@id" })
+        var forbidden = new[]
+        {
+            (Sql: "UPDATE dbo.FinancialTransactions SET CreatedAtUtc=CreatedAtUtc WHERE Id=@id", Error: 230),
+            (Sql: "DELETE FROM dbo.FinancialTransactions WHERE Id=@id", Error: 229)
+        };
+        foreach (var operation in forbidden)
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = sql;
+            command.CommandText = operation.Sql;
             command.Parameters.AddWithValue("@id", id);
             var denied = await Assert.ThrowsAsync<SqlException>(() => command.ExecuteNonQueryAsync(Cancellation));
-            Assert.Equal(229, denied.Number);
+            Assert.Equal(operation.Error, denied.Number);
         }
         await using var metadata = connection.CreateCommand();
         metadata.CommandText = "SELECT name, TYPE_NAME(user_type_id), precision, scale FROM sys.columns WHERE object_id=OBJECT_ID('dbo.FinancialTransactions')";

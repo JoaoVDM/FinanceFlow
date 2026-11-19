@@ -16,6 +16,10 @@ A **Entrega C — Edição, atividade e concorrência** está implementada e val
 
 A baseline da **Etapa 5A** é `76e909b`, na branch `main`: o usuário confirmou a publicação da Etapa 4, 311 testes locais aprovados e CI aprovada. Essa confirmação é posterior ao fechamento histórico acima e não comprova as alterações locais da Entrega 5A. Posteriormente, o usuário validou a suíte completa de 5A no PowerShell com Docker/SQL Server/Testcontainers: **386 testes aprovados, 0 falhas e 0 ignorados**. A revisão consolidada dos 32 arquivos foi aprovada, sem problemas bloqueantes. O histórico de Docker inacessível no sandbox foi preservado; os avisos NU1900 mantêm a auditoria de vulnerabilidades inconclusiva. Não há aprovação de CI ou publicação de 5A confirmada. Veja [escopo e evidências](docs/etapa-5/README.md).
 
+A **Entrega 5A foi posteriormente publicada em `f9e7d12`**, com 386 testes locais aprovados e GitHub Actions workflow **#7 aprovado**, conforme confirmação do usuário. Essa é a baseline de 5B; não comprova as alterações locais seguintes.
+
+A **Entrega 5B — Edição e exclusão lógica de transações** está implementada localmente e validada externamente pelo usuário no PowerShell com SQL Server/Testcontainers: **461 testes aprovados, 0 falhas e 0 ignorados**, em aproximadamente 1m39s. PUT/DELETE exigem JWT e If-Match forte, retornam 204 sem corpo e novo ETag. A revisão técnica consolidada dos 22 arquivos contra `f9e7d12` foi aprovada, sem problemas bloqueantes. O histórico de 285 aprovações e 176 falhas na fixture Docker do sandbox permanece registrado separadamente. A auditoria NuGet continua inconclusiva pelos NU1900; não há publicação ou CI aprovada de 5B. Veja [escopo, regras e evidências de 5B](docs/etapa-5/entrega-5b-validacao.md).
+
 ## Requisitos e instalação
 
 - .NET SDK estável da faixa 10.0.4xx; global.json aceita patches dessa faixa, incluindo 10.0.404.
@@ -59,7 +63,7 @@ docker compose up -d api
 
 Os serviços de ferramentas têm perfil próprio e são acionados explicitamente. O segundo provisionamento concede acesso aos objetos após a migration. Não há migration automática no startup da API. Nenhum passo apaga volumes ou redefine senhas de logins já existentes.
 
-O SQL usa um volume nomeado e porta `127.0.0.1:14333`; a API usa o host interno `sqlserver`, nunca sa. Há três identidades separadas: administrador apenas no provisionamento, FinanceFlowMigrator para DDL e FinanceFlowApi para SELECT/INSERT/UPDATE em AspNetUsers, SELECT em __EFMigrationsHistory e SELECT/INSERT em FinancialAccounts/Categories/IdempotencyRecords/FinancialTransactions. UPDATE financeiro permanece restrito às colunas editáveis de contas e categorias introduzidas na Entrega C. Transações e registros idempotentes não recebem UPDATE/DELETE; a API não recebe DELETE financeiro, DDL ou credenciais administrativas. O provisionamento rejeita privilégios excessivos, sem remover permissões existentes silenciosamente.
+O SQL usa um volume nomeado e porta `127.0.0.1:14333`; a API usa o host interno `sqlserver`, nunca sa. Há três identidades separadas: administrador apenas no provisionamento, FinanceFlowMigrator para DDL e FinanceFlowApi para SELECT/INSERT/UPDATE em AspNetUsers, SELECT em __EFMigrationsHistory e SELECT/INSERT em FinancialAccounts/Categories/IdempotencyRecords/FinancialTransactions. UPDATE financeiro permanece restrito às colunas editáveis de contas/categorias da Entrega C e às nove colunas de transações da Entrega 5B, documentadas abaixo. IdempotencyRecords continua sem UPDATE/DELETE; a API não recebe DELETE financeiro, DDL ou credenciais administrativas. O provisionamento rejeita privilégios excessivos, sem remover permissões existentes silenciosamente.
 
 Imagem SQL fixada: `mcr.microsoft.com/mssql/server:2022-CU22-GDR1-ubuntu-22.04`, SQL Server 2022 Developer. Tag confirmada no registro oficial e execução healthy confirmada na validação externa. A revisão da atualização de segurança mais recente continua necessária antes de exposição pública. Este pin serve ao ambiente local reproduzível, não declara a imagem atualizada para publicação. SQL usa criptografia com certificado do contêiner aceito apenas no ambiente local; em hospedagem, use validação de certificado adequada.
 
@@ -140,11 +144,26 @@ Não há nova migration. O provisionamento passa a permitir UPDATE por coluna: F
 | GET | /api/v1/transactions/{id} | JWT; recurso próprio e ETag; alheio/inexistente retorna 404 |
 | GET | /api/v1/accounts/{id}/balance | JWT; asOf opcional, inclusivo e sem futuro; accountId/currency/asOf/balance |
 
-POST aceita somente accountId, categoryId, kind (income/expense), amount positivo com centavos exatos, occurredOn e description opcional até 500 caracteres. Conta e categoria devem ser próprias e ativas; a categoria deve ter o mesmo tipo. A data vai da abertura da conta até hoje em America/Sao_Paulo. A transação SQL RepeatableRead mantém protegidas as leituras de atividade até a gravação e o commit do snapshot idempotente. Vínculo inativo: 409; referência alheia/inexistente: 404; valor/data/tipo incompatível: 400. Não há PUT/DELETE de transações.
+POST aceita somente accountId, categoryId, kind (income/expense), amount positivo com centavos exatos, occurredOn e description opcional até 500 caracteres. Conta e categoria devem ser próprias e ativas; a categoria deve ter o mesmo tipo. A data vai da abertura da conta até hoje em America/Sao_Paulo. A transação SQL RepeatableRead mantém protegidas as leituras de atividade até a gravação e o commit do snapshot idempotente. Vínculo inativo: 409; referência alheia/inexistente: 404; valor/data/tipo incompatível: 400. O escopo original de 5A não incluía edição/exclusão; esses endpoints estão em 5B abaixo.
 
 As listas usam page=1/pageSize=20 (máximo 100), sort=occurredOn/amount/id e direction=asc/desc, com padrão occurredOn desc e desempate por Id. Datas são YYYY-MM-DD; filtros monetários são não negativos, limitados e com centavos exatos, inclusive na query string. Respostas financeiras usam no-store.
 
 O saldo é OpeningBalance + receitas válidas - despesas válidas até o corte, inclusive movimentos retroativos; antes da abertura retorna zero. Contas inativas continuam incluídas. Não há CurrentBalance persistido. A migration incremental é `20261117000100_TransactionsDelivery5A`; exige aplicação explícita e novo provisionamento SELECT/INSERT em FinancialTransactions quando houver autorização para atualizar um ambiente persistente. Nada foi aplicado ao banco persistente nesta implementação. Consulte [validações e limitações](docs/etapa-5/entrega-5a-validacao.md).
+
+## Edição e exclusão de transações — Entrega 5B local
+
+| Método | Rota | Contrato |
+|---|---|---|
+| PUT | /api/v1/transactions/{id} | Substitui accountId/categoryId/kind/amount/occurredOn/description; JWT e If-Match |
+| DELETE | /api/v1/transactions/{id} | Sem corpo; exclusão lógica própria com JWT e If-Match |
+
+Sucesso: 204 vazio, novo ETag e no-store. If-Match ausente: 428; malformado: 400; versão antiga em recurso vivo: 412; recurso alheio, inexistente ou excluído: 404. Exclusões repetidas com header válido retornam 404. PUT sem mudanças continua executando UPDATE condicional, inclusive com relógio fixo.
+
+Correções exclusivamente descritivas são permitidas com conta/categoria históricas inativas. Qualquer mudança financeira ou reassociação exige conta original e destino ativas; categoria nova deve estar ativa. Categoria histórica inalterada pode permanecer inativa. O PUT valida categoria compatível, valor positivo/centavos exatos e data entre abertura do destino e hoje financeiro. Description é opcional, aceita null e tem limite de 500 caracteres. DELETE independe da atividade e preserva os dados financeiros.
+
+O UPDATE utiliza a rowversion enviada pelo cliente no predicado SQL. A leitura inicial é otimista; o PUT protege as referências dentro de RepeatableRead até o commit, evitando conversões de shared lock na linha da transação entre dois editores. DELETE não consulta atividade. As duas operações têm rollback local e não fazem retry em conflitos. Saldos e cortes históricos usam os valores atuais e ignoram excluídas. O POST e seu snapshot idempotente permanecem originais após edição/exclusão.
+
+Não há nova migration: schema e quatro migrations históricas permanecem intactos. O provisionamento passa a conceder UPDATE somente em AccountId, CategoryId, Kind, Amount, OccurredOn, Description, UpdatedAtUtc, IsDeleted e DeletedAtUtc de FinancialTransactions. Id/UserId/CreatedAtUtc/RowVersion não recebem UPDATE; DELETE físico/DDL e UPDATE em IdempotencyRecords continuam proibidos. Aplicação desse provisionamento em banco persistente depende de autorização específica e não foi executada. Detalhes e comandos de teste em [validação de 5B](docs/etapa-5/entrega-5b-validacao.md).
 
 ## Endpoints de identidade
 
@@ -214,6 +233,6 @@ O workflow em .github/workflows/build.yml verifica Docker e executa restore, bui
 
 ## Próximos passos
 
-A regressão externa de 5A (386 aprovados, sem falhas ou ignorados) e a revisão técnica consolidada estão aprovadas. Repetir a auditoria NuGet quando o índice estiver disponível; os avisos NU1900 não permitem uma conclusão de segurança. Publicação e CI de 5A ainda dependem de autorização e validação posteriores. As Entregas 5B/5C e a Etapa 6 não foram iniciadas. Veja [evidências de 5A](docs/etapa-5/entrega-5a-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
+A publicação de 5A e o workflow #7 foram confirmados pelo usuário. A regressão externa de 5B (461 aprovados, sem falhas ou ignorados) e a revisão técnica consolidada estão aprovadas. Repetir a auditoria NuGet com índice acessível: os avisos NU1900 não permitem uma conclusão de segurança. Publicação e CI de 5B permanecem pendentes; nenhum stage, commit ou push foi executado pelo Codex. A Entrega 5C e a Etapa 6 não foram iniciadas. Veja [evidências de 5B](docs/etapa-5/entrega-5b-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
 
 Licença MIT é a proposta registrada para a preparação da release; nenhum arquivo de licença foi incluído nesta etapa. Resultados de testes e prontidão devem ser avaliados pelas evidências, sem badges de sucesso não verificados.

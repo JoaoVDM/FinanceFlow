@@ -90,6 +90,48 @@ public sealed class FinancialTransactionsService(IFinancialTransactionStore stor
         return balance is null ? new(Error: TransactionFailure.NotFound) : new(Balance: balance);
     }
 
+    public async Task<TransactionChangeResult> UpdateAsync(Guid id, UpdateTransactionCommand command,
+        byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
+        {
+            return new(Error: TransactionFailure.Unauthenticated);
+        }
+        if (expectedVersion is not { Length: 8 })
+        {
+            return new(Error: TransactionFailure.InvalidInput);
+        }
+
+        var now = clock.GetUtcNow();
+        var today = calendar.DateAt(now);
+        var details = new TransactionDetails(command.AccountId, command.CategoryId, command.Kind,
+            command.Amount, command.OccurredOn, command.Description);
+        try
+        {
+            FinancialTransaction.ValidateDetails(details, today);
+        }
+        catch (ArgumentException)
+        {
+            return new(Error: TransactionFailure.InvalidInput);
+        }
+        return await store.UpdateAsync(userId, id, details, expectedVersion.ToArray(), today, now, cancellationToken);
+    }
+
+    public Task<TransactionChangeResult> DeleteAsync(Guid id, byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
+        {
+            return Task.FromResult(new TransactionChangeResult(Error: TransactionFailure.Unauthenticated));
+        }
+        if (expectedVersion is not { Length: 8 })
+        {
+            return Task.FromResult(new TransactionChangeResult(Error: TransactionFailure.InvalidInput));
+        }
+        return store.DeleteAsync(userId, id, expectedVersion.ToArray(), clock.GetUtcNow(), cancellationToken);
+    }
+
     private static bool IsAmountFilterValid(decimal amount) =>
         amount >= 0m && amount <= MonetaryLimits.MaximumAmount && amount % 0.01m == 0m;
 }

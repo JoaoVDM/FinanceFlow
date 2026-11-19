@@ -140,3 +140,7 @@ Regressão externa e revisão técnica consolidadas aprovadas. Permanece pendent
 Fontes técnicas consultadas: [transações EF Core](https://learn.microsoft.com/en-us/ef/core/saving/transactions), [isolamento SQL Server](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql) e [SUM/precisão decimal](https://learn.microsoft.com/en-us/sql/t-sql/functions/sum-transact-sql).
 
 **Sem stage, commit ou push. Sem alterações em banco persistente, credenciais, certificados, volumes ou permissões do ambiente. 5B/5C/6 não iniciadas.**
+
+## Publicação posterior confirmada pelo usuário
+
+Após o fechamento histórico acima, o usuário confirmou a publicação de 5A no commit **f9e7d12**, com **386 testes aprovados, zero falhas/ignorados** e GitHub Actions **workflow #7 aprovado**. Esses resultados constituem a baseline da [Entrega 5B](entrega-5b-validacao.md) e não comprovam suas alterações locais. O histórico anterior e a ressalva da auditoria NuGet inconclusiva foram preservados. Nenhuma evidência de atualização de banco persistente é inferida dessa publicação.
