@@ -152,3 +152,7 @@ Pendências: concluir a consulta de vulnerabilidades com índice acessível e, a
 Referências técnicas consultadas: [concorrência EF Core](https://learn.microsoft.com/en-us/ef/core/saving/concurrency), [isolamento SQL Server](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql) e [rollback/limpeza da transação no EF Core](https://github.com/dotnet/efcore/blob/v10.0.0/src/EFCore.Relational/Storage/RelationalTransaction.cs).
 
 **Sem stage, commit, push, alterações em credenciais/certificados/volumes ou no sandbox. Entrega 5C e Etapa 6 não iniciadas.**
+
+## Publicação posterior confirmada pelo usuário
+
+Após o fechamento histórico acima, o usuário confirmou a publicação de 5B em **b548f4f**, com **461 testes locais aprovados, zero falhas e zero ignorados** e GitHub Actions **workflow #8 — Success**. A publicação de 5A permanece em **f9e7d12**, com CI #7 aprovada. São evidências externas anteriores à [Entrega 5C](entrega-5c-validacao.md); não comprovam suas alterações ou encerram a Etapa 5. O histórico do sandbox, a auditoria NuGet inconclusiva e os registros de publicação/CI então pendentes foram preservados em sua sequência cronológica.

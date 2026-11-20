@@ -84,9 +84,10 @@ public sealed class TransactionMutationConcurrencySqlTests(IdentitySqlFixture fi
     }
 
     [Theory]
-    [InlineData("FinancialAccounts")]
-    [InlineData("Categories")]
-    public async Task Reassociation_holds_reference_shared_locks_until_commit_and_deactivation_waits(string table)
+    [InlineData("FinancialAccounts", false)]
+    [InlineData("Categories", false)]
+    [InlineData("FinancialAccounts", true)]
+    public async Task Reassociation_holds_reference_shared_locks_until_commit_and_deactivation_waits(string table, bool sourceAccount)
     {
         var observer = new MutationObserver();
         using var factory = new MutationFactory(fixture, observer);
@@ -94,6 +95,7 @@ public sealed class TransactionMutationConcurrencySqlTests(IdentitySqlFixture fi
         await CategoryTestRequests.AuthenticateAsync(client);
         var source = await ReferencesAsync(client);
         var target = await ReferencesAsync(client);
+        var deactivated = sourceAccount ? source : target;
         using var created = await CreateAsync(client, source);
         var body = Payload(await ReadAsync(created)) with { AccountId = target.AccountId, CategoryId = target.CategoryId };
         observer.PauseReferences = true;
@@ -105,8 +107,8 @@ public sealed class TransactionMutationConcurrencySqlTests(IdentitySqlFixture fi
             Assert.Equal(IsolationLevel.RepeatableRead, observer.ReferenceIsolation);
             Assert.True(await HasHeldLockAsync(observer.SessionId, table));
             deactivating = FinancialChangeRequests.ChangeAsync(client,
-                table == "FinancialAccounts" ? target.AccountLocation : target.CategoryLocation, "PATCH", new { isActive = false },
-                table == "FinancialAccounts" ? target.AccountVersion : target.CategoryVersion);
+                table == "FinancialAccounts" ? deactivated.AccountLocation : deactivated.CategoryLocation, "PATCH", new { isActive = false },
+                table == "FinancialAccounts" ? deactivated.AccountVersion : deactivated.CategoryVersion);
             await observer.DeactivationStarted.Task.WaitAsync(TimeSpan.FromSeconds(20), Cancellation);
             Assert.False(deactivating.IsCompleted);
         }
@@ -123,9 +125,10 @@ public sealed class TransactionMutationConcurrencySqlTests(IdentitySqlFixture fi
     }
 
     [Theory]
-    [InlineData("FinancialAccounts")]
-    [InlineData("Categories")]
-    public async Task Deactivation_committed_before_reference_validation_blocks_the_new_link(string table)
+    [InlineData("FinancialAccounts", false)]
+    [InlineData("Categories", false)]
+    [InlineData("FinancialAccounts", true)]
+    public async Task Deactivation_committed_before_reference_validation_blocks_the_new_link(string table, bool sourceAccount)
     {
         var observer = new MutationObserver { ReadTable = table };
         using var factory = new MutationFactory(fixture, observer);
@@ -133,6 +136,7 @@ public sealed class TransactionMutationConcurrencySqlTests(IdentitySqlFixture fi
         await CategoryTestRequests.AuthenticateAsync(client);
         var source = await ReferencesAsync(client);
         var target = await ReferencesAsync(client);
+        var deactivated = sourceAccount ? source : target;
         using var created = await CreateAsync(client, source);
         var body = Payload(await ReadAsync(created)) with { AccountId = target.AccountId, CategoryId = target.CategoryId };
         await using var connection = new SqlConnection(fixture.MigrationConnectionString);
@@ -141,7 +145,7 @@ public sealed class TransactionMutationConcurrencySqlTests(IdentitySqlFixture fi
         await using var command = connection.CreateCommand();
         command.Transaction = sqlTransaction;
         command.CommandText = $"UPDATE dbo.{table} SET IsActive=0 WHERE Id=@id";
-        command.Parameters.AddWithValue("@id", table == "FinancialAccounts" ? target.AccountId : target.CategoryId);
+        command.Parameters.AddWithValue("@id", table == "FinancialAccounts" ? deactivated.AccountId : deactivated.CategoryId);
         Assert.Equal(1, await command.ExecuteNonQueryAsync(Cancellation));
         observer.ObserveReferenceStart = true;
 

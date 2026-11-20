@@ -71,12 +71,28 @@ public sealed class FinancialTransactionStore(FinanceFlowDbContext db, DbContext
             var winner = await FindRecordAsync(recovery, value.UserId, key, cancellationToken);
             return winner is null ? new(Error: TransactionFailure.Unavailable) : Replay(winner, hash);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 1205 or -2 })
+        catch (Exception exception) when (IsTemporaryCreationFailure(exception))
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            // SQL may already have aborted the deadlock victim. Disposal rolls back any
+            // remaining transaction without explicitly rolling back a completed one.
             return new(Error: TransactionFailure.Unavailable);
         }
         // Early returns or unexpected failures dispose/roll back the transaction. No partial success.
+    }
+
+    private static bool IsTemporaryCreationFailure(Exception exception)
+    {
+        // The non-retrying SQL Server execution strategy wraps transient SaveChanges
+        // failures in InvalidOperationException; never classify every such exception as 503.
+        if (exception is InvalidOperationException { InnerException: { } strategyFailure })
+        {
+            exception = strategyFailure;
+        }
+        if (exception is DbUpdateException { InnerException: { } updateFailure })
+        {
+            exception = updateFailure;
+        }
+        return exception is SqlException { Number: 1205 or -2 };
     }
 
     public async Task<TransactionChangeResult> UpdateAsync(Guid userId, Guid id, TransactionDetails details,
