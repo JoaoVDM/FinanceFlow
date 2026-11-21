@@ -269,11 +269,14 @@ public sealed class FinancialTransactionStore(FinanceFlowDbContext db, DbContext
                 account.Id, account.Currency, account.OpeningDate, account.OpeningBalance,
                 Net = db.FinancialTransactions.Where(value => value.UserId == userId && value.AccountId == accountId
                         && !value.IsDeleted && value.OccurredOn <= asOf)
-                    .Sum(value => (decimal?)(value.Kind == "income" ? value.Amount : -value.Amount)) ?? 0m
+                    .Sum(value => (decimal?)(value.Kind == "income" ? value.Amount : -value.Amount)) ?? 0m,
+                TransferNet = db.Transfers.Where(value => value.UserId == userId && !value.IsCanceled && value.OccurredOn <= asOf
+                        && (value.SourceAccountId == accountId || value.DestinationAccountId == accountId))
+                    .Sum(value => (decimal?)(value.DestinationAccountId == accountId ? value.Amount : -value.Amount)) ?? 0m
             }).SingleOrDefaultAsync(cancellationToken);
 
         return position is null ? null : new(position.Id, position.Currency, asOf,
-            asOf < position.OpeningDate ? 0m : checked(position.OpeningBalance + position.Net));
+            asOf < position.OpeningDate ? 0m : checked(position.OpeningBalance + position.Net + position.TransferNet));
     }
 
     private static IdempotencyRecord CreateRecord(FinancialTransaction value, string key, byte[] hash)

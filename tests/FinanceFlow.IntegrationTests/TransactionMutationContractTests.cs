@@ -42,7 +42,7 @@ public sealed class TransactionMutationContractTests
         using var db = new FinanceFlowDbContext(new DbContextOptionsBuilder<FinanceFlowDbContext>()
             .UseSqlServer("Server=localhost;Database=UnusedModelCheck;Integrated Security=True").Options);
         Assert.False(db.Database.HasPendingModelChanges());
-        Assert.Equal(4, db.Database.GetMigrations().Count());
+        Assert.Equal(5, db.Database.GetMigrations().Count());
         var transaction = db.Model.FindEntityType(typeof(FinancialTransaction))!;
         Assert.Equal(PropertySaveBehavior.Throw, transaction.FindProperty("UserId")!.GetAfterSaveBehavior());
         Assert.Equal(PropertySaveBehavior.Throw, transaction.FindProperty("CreatedAtUtc")!.GetAfterSaveBehavior());

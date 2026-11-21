@@ -36,6 +36,8 @@ public sealed class HealthController : ControllerBase
                 .Select(category => category.Id).Take(1).ToListAsync(cancellationToken);
             await db.FinancialTransactions.AsNoTracking().OrderBy(transaction => transaction.Id)
                 .Select(transaction => transaction.Id).Take(1).ToListAsync(cancellationToken);
+            await db.Transfers.AsNoTracking().OrderBy(transfer => transfer.Id)
+                .Select(transfer => transfer.Id).Take(1).ToListAsync(cancellationToken);
             return Ok(new HealthResponse("ready"));
         }
         catch (Exception exception) when (exception is System.Data.Common.DbException or InvalidOperationException or TimeoutException)

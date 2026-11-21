@@ -113,6 +113,11 @@ public static class DatabaseTasks
                     SET @grant = N'GRANT UPDATE ON OBJECT::dbo.FinancialTransactions (AccountId, CategoryId, Kind, Amount, OccurredOn, Description, UpdatedAtUtc, IsDeleted, DeletedAtUtc) TO ' + QUOTENAME(@username);
                     EXEC(@grant);
                   END
+                  IF OBJECT_ID(N'dbo.Transfers') IS NOT NULL
+                  BEGIN
+                    SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.Transfers TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
+                  END
                 END
                 """;
             user.Parameters.AddWithValue("@username", identity.UserID);
@@ -148,7 +153,7 @@ public static class DatabaseTasks
                       AND major_id = COALESCE(OBJECT_ID('dbo.AspNetUsers'), -1)
                       AND permission_name IN ('SELECT', 'INSERT', 'UPDATE'))
                     OR (class = 1 AND minor_id = 0
-                      AND major_id IN (COALESCE(OBJECT_ID('dbo.FinancialAccounts'), -1), COALESCE(OBJECT_ID('dbo.IdempotencyRecords'), -1), COALESCE(OBJECT_ID('dbo.Categories'), -1), COALESCE(OBJECT_ID('dbo.FinancialTransactions'), -1))
+                      AND major_id IN (COALESCE(OBJECT_ID('dbo.FinancialAccounts'), -1), COALESCE(OBJECT_ID('dbo.IdempotencyRecords'), -1), COALESCE(OBJECT_ID('dbo.Categories'), -1), COALESCE(OBJECT_ID('dbo.FinancialTransactions'), -1), COALESCE(OBJECT_ID('dbo.Transfers'), -1))
                       AND permission_name IN ('SELECT', 'INSERT'))
                     OR (class = 1 AND minor_id = 0
                       AND major_id = COALESCE(OBJECT_ID('dbo.__EFMigrationsHistory'), -1)

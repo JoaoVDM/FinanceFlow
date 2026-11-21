@@ -50,7 +50,7 @@ public sealed class CategoryPersistenceSqlTests(IdentitySqlFixture fixture)
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FinanceFlowDbContext>();
         Assert.False(db.Database.HasPendingModelChanges());
-        Assert.Equal(new[] { "20261113000100_InitialIdentity", "20261114000100_AccountsDeliveryA", "20261114000200_CategoriesDeliveryB", "20261117000100_TransactionsDelivery5A" },
+        Assert.Equal(new[] { "20261113000100_InitialIdentity", "20261114000100_AccountsDeliveryA", "20261114000200_CategoriesDeliveryB", "20261117000100_TransactionsDelivery5A", "20261120000100_TransfersDelivery6A" },
             await db.Database.GetAppliedMigrationsAsync(TestCancellationToken));
     }
 

@@ -2,6 +2,8 @@ using FinanceFlow.Application.Users;
 using FinanceFlow.Application.Accounts;
 using FinanceFlow.Application.Categories;
 using FinanceFlow.Application.Transactions;
+using FinanceFlow.Application.Transfers;
+using FinanceFlow.Infrastructure.Persistence.Transfers;
 using FinanceFlow.Infrastructure.Persistence.Transactions;
 using FinanceFlow.Infrastructure.Persistence.Categories;
 using FinanceFlow.Infrastructure.Persistence.Accounts;
@@ -30,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<ICategoryStore, CategoryStore>();
         services.AddScoped<FinancialTransactionsService>();
         services.AddScoped<IFinancialTransactionStore, FinancialTransactionStore>();
+        services.AddScoped<TransfersService>();
+        services.AddScoped<ITransferStore, TransferStore>();
         services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
         services.AddOptions<DatabaseOptions>().Bind(configuration.GetSection(DatabaseOptions.SectionName)).ValidateOnStart();
         services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();

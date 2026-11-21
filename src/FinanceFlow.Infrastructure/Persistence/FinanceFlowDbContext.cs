@@ -8,6 +8,8 @@ using FinanceFlow.Domain.Categories;
 using FinanceFlow.Infrastructure.Persistence.Categories;
 using FinanceFlow.Domain.Transactions;
 using FinanceFlow.Infrastructure.Persistence.Transactions;
+using FinanceFlow.Domain.Transfers;
+using FinanceFlow.Infrastructure.Persistence.Transfers;
 
 namespace FinanceFlow.Infrastructure.Persistence;
 
@@ -18,6 +20,7 @@ public sealed class FinanceFlowDbContext(DbContextOptions<FinanceFlowDbContext> 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
+    public DbSet<Transfer> Transfers => Set<Transfer>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -25,6 +28,7 @@ public sealed class FinanceFlowDbContext(DbContextOptions<FinanceFlowDbContext> 
         builder.ApplyConfiguration(new IdempotencyRecordConfiguration());
         builder.ApplyConfiguration(new CategoryConfiguration());
         builder.ApplyConfiguration(new FinancialTransactionConfiguration());
+        builder.ApplyConfiguration(new TransferConfiguration());
         builder.Entity<IdentityUserLogin<Guid>>().Property(x => x.LoginProvider).HasMaxLength(128);
         builder.Entity<IdentityUserLogin<Guid>>().Property(x => x.ProviderKey).HasMaxLength(128);
         builder.Entity<IdentityUserToken<Guid>>().Property(x => x.LoginProvider).HasMaxLength(128);

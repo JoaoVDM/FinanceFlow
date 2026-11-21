@@ -53,7 +53,7 @@ public sealed class TransactionsPersistenceSqlTests(IdentitySqlFixture fixture)
         await using var scope = factory.Services.CreateAsyncScope();
         var current = scope.ServiceProvider.GetRequiredService<FinanceFlowDbContext>();
         Assert.False(current.Database.HasPendingModelChanges());
-        Assert.Equal(4, (await current.Database.GetAppliedMigrationsAsync(Cancellation)).Count());
+        Assert.Equal(5, (await current.Database.GetAppliedMigrationsAsync(Cancellation)).Count());
     }
 
     [Fact]

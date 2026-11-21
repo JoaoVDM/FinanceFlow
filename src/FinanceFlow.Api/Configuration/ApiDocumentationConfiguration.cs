@@ -3,6 +3,7 @@ using FinanceFlow.Api.Contracts.Accounts;
 using FinanceFlow.Api.Contracts.Categories;
 using FinanceFlow.Application.Categories;
 using FinanceFlow.Api.Contracts.Transactions;
+using FinanceFlow.Api.Contracts.Transfers;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -25,6 +26,7 @@ internal static class ApiDocumentationConfiguration
             options.AddSchemaTransformer(ConfigureCategorySchemasAsync);
             options.AddSchemaTransformer(ConfigureActivitySchemasAsync);
             options.AddSchemaTransformer(ConfigureTransactionSchemasAsync);
+            options.AddSchemaTransformer(ConfigureTransferSchemasAsync);
             options.AddDocumentTransformer(ConfigureDocumentAsync);
         });
 
@@ -115,6 +117,7 @@ internal static class ApiDocumentationConfiguration
             || path.Key.StartsWith("/api/v1/accounts", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/categories", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/transactions", StringComparison.Ordinal)
+            || path.Key.StartsWith("/api/v1/transfers", StringComparison.Ordinal)
             || path.Key.EndsWith("/auth/logout", StringComparison.Ordinal));
 
         foreach (var path in protectedPaths)
@@ -344,6 +347,20 @@ internal static class ApiDocumentationConfiguration
         return Task.CompletedTask;
     }
 
+    private static Task ConfigureTransferSchemasAsync(
+        OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken cancellationToken)
+    {
+        if (context.JsonTypeInfo.Type == typeof(CreateTransferRequest) && schema.Properties is not null)
+        {
+            schema.Properties["amount"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.Number, Minimum = "0.01", Maximum = "999999999999.99", MultipleOf = 0.01m,
+                Description = "Positive BRL decimal with exact cents; no silent rounding."
+            };
+        }
+        return Task.CompletedTask;
+    }
+
     private static void ConfigureTransactionOperations(OpenApiDocument document)
     {
         if (document.Paths is null)
@@ -353,9 +370,10 @@ internal static class ApiDocumentationConfiguration
         if (document.Paths.TryGetValue("/api/v1/accounts/{id}/balance", out var balancePath)
             && balancePath.Operations?.TryGetValue(HttpMethod.Get, out var balanceOperation) == true)
         {
-            balanceOperation.Description = "BRL balance from opening balance and valid income/expense through inclusive asOf (yyyy-MM-dd). Default: today in America/Sao_Paulo; future rejected. Before opening: zero. Inactive accounts remain included. No persisted current balance.";
+            balanceOperation.Description = "BRL balance from opening balance, valid income/expense and noncanceled transfers in/out through inclusive asOf (yyyy-MM-dd). Default: today in America/Sao_Paulo; future rejected. Before opening: zero. Inactive accounts remain included. No persisted current balance.";
         }
-        foreach (var (path, resource) in document.Paths.Where(path => path.Key.StartsWith("/api/v1/transactions", StringComparison.Ordinal)))
+        foreach (var (path, resource) in document.Paths.Where(path => path.Key.StartsWith("/api/v1/transactions", StringComparison.Ordinal)
+            || path.Key.StartsWith("/api/v1/transfers", StringComparison.Ordinal)))
         {
             if (resource.Operations is null)
             {
@@ -420,7 +438,9 @@ internal static class ApiDocumentationConfiguration
                     }
                     if (status == "201")
                     {
-                        writable.Headers["Location"] = new OpenApiHeader { Schema = new OpenApiSchema { Type = JsonSchemaType.String }, Description = "Created transaction URL, preserved on replay." };
+                        writable.Headers["Location"] = new OpenApiHeader { Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                            Description = path.StartsWith("/api/v1/transfers", StringComparison.Ordinal)
+                                ? "Created transfer URL, preserved on replay." : "Created transaction URL, preserved on replay." };
                     }
                 }
             }

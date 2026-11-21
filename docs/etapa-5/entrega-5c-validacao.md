@@ -197,3 +197,7 @@ dotnet tests/FinanceFlow.IntegrationTests/bin/Release/net10.0/FinanceFlow.Integr
 - Publicação de 5C exige autorização; CI de 5C ainda não foi executada/aprovada. A validação externa já foi confirmada, mas o encerramento oficial da Etapa 5 depende de publicação autorizada e CI aprovada.
 
 **Sem stage, commit ou push. Etapa 6, transferências, extratos e relatórios não iniciados.**
+
+## Publicação e encerramento posterior confirmados pelo usuário
+
+Após os registros históricos acima, o usuário confirmou **5C publicada em f0969b8, CI workflow #9 aprovada e 477 testes locais aprovados, zero falhas e zero ignorados**, concluindo a Etapa 5. A consulta NuGet inconclusiva por NU1900 e as falhas históricas do sandbox não foram apagadas. A [Entrega 6A](../etapa-6/entrega-6a-validacao.md) foi autorizada posteriormente sobre essa baseline; sua implementação e validações não são comprovadas pelos resultados de 5C. Nenhum commit ou push foi realizado pelo Codex.
