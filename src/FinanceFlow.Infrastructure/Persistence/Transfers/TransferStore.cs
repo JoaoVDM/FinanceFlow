@@ -68,10 +68,64 @@ public sealed class TransferStore(FinanceFlowDbContext db, DbContextOptions<Fina
             var winner = await FindRecordAsync(recovery, value.UserId, key, cancellationToken);
             return winner is null ? new(Error: TransferFailure.Unavailable) : Replay(winner, hash);
         }
-        catch (Exception exception) when (IsTemporaryCreationFailure(exception))
+        catch (Exception exception) when (IsTemporarySqlFailure(exception))
         {
             // Disposal rolls back the unit; a deadlock victim may already be aborted by SQL Server.
             return new(Error: TransferFailure.Unavailable);
+        }
+    }
+
+    public async Task<TransferCancellationResult> CancelAsync(Guid userId, Guid id, byte[] expectedVersion,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Include both reads and transaction disposal, not only the write, in the same
+            // restricted SQL classification. Request cancellation and unexpected errors propagate.
+            return await CancelWithConcurrencyAsync(userId, id, expectedVersion, now, cancellationToken);
+        }
+        catch (Exception exception) when (IsTemporarySqlFailure(exception))
+        {
+            return new(Error: TransferFailure.Unavailable);
+        }
+    }
+
+    private async Task<TransferCancellationResult> CancelWithConcurrencyAsync(Guid userId, Guid id, byte[] expectedVersion,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        // Read outside the write transaction, as in transaction deletion. Concurrent readers
+        // must not retain shared locks and deadlock when both try to cancel the same row.
+        var value = await db.Transfers.SingleOrDefaultAsync(transfer => transfer.Id == id
+            && transfer.UserId == userId && !transfer.IsCanceled, cancellationToken);
+        if (value is null)
+        {
+            return new(Error: TransferFailure.NotFound);
+        }
+        if (!value.RowVersion.AsSpan().SequenceEqual(expectedVersion))
+        {
+            return new(Error: TransferFailure.VersionConflict);
+        }
+
+        // Cancellation does not validate activity or update either account. The explicit unit
+        // also rolls back a failure after SaveChanges but before commit.
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            value.Cancel(now);
+            var entry = db.Entry(value);
+            entry.Property(transfer => transfer.RowVersion).OriginalValue = expectedVersion.ToArray();
+            entry.Property(transfer => transfer.UpdatedAtUtc).IsModified = true;
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new(Version: Convert.ToBase64String(value.RowVersion));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            db.Entry(value).State = EntityState.Detached;
+            var exists = await db.Transfers.AsNoTracking().AnyAsync(transfer => transfer.Id == id
+                && transfer.UserId == userId && !transfer.IsCanceled, cancellationToken);
+            return new(Error: exists ? TransferFailure.VersionConflict : TransferFailure.NotFound);
         }
     }
 
@@ -114,7 +168,7 @@ public sealed class TransferStore(FinanceFlowDbContext db, DbContextOptions<Fina
             && error.Message.StartsWith("Cannot insert duplicate key row in object 'dbo.IdempotencyRecords' with unique index '"
                 + IdempotencyRecordConfiguration.UniqueIndex + "'.", StringComparison.Ordinal));
 
-    private static bool IsTemporaryCreationFailure(Exception exception)
+    private static bool IsTemporarySqlFailure(Exception exception)
     {
         if (exception is InvalidOperationException { InnerException: { } strategyFailure })
         {

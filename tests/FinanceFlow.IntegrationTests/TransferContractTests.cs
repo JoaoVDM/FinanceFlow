@@ -56,7 +56,7 @@ public sealed class TransferContractTests
     }
 
     [Fact]
-    public async Task Openapi_exposes_only_transfer_creation_and_individual_read_with_strong_headers()
+    public async Task Openapi_preserves_transfer_creation_and_read_headers_alongside_cancellation()
     {
         using var factory = new ApiFactory("Development");
         using var client = factory.CreateClient();
@@ -67,7 +67,7 @@ public sealed class TransferContractTests
         var collection = paths.GetProperty("/api/v1/transfers");
         var individual = paths.GetProperty("/api/v1/transfers/{id}");
         Assert.Equal(new[] { "post" }, collection.EnumerateObject().Select(value => value.Name));
-        Assert.Equal(new[] { "get" }, individual.EnumerateObject().Select(value => value.Name));
+        Assert.Equal(new[] { "delete", "get" }, individual.EnumerateObject().Select(value => value.Name).Order());
         foreach (var operation in new[] { collection.GetProperty("post"), individual.GetProperty("get") })
         {
             Assert.True(operation.GetProperty("security")[0].TryGetProperty("Bearer", out _));

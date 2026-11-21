@@ -1,7 +1,9 @@
 using FinanceFlow.Api.Contracts.Transfers;
+using FinanceFlow.Api.Concurrency;
 using FinanceFlow.Application.Transfers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace FinanceFlow.Api.Controllers;
 
@@ -52,11 +54,42 @@ public sealed class TransfersController(TransfersService transfers) : Controller
         return Ok(result.Transfer);
     }
 
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType<ProblemDetails>(400)]
+    [ProducesResponseType<ProblemDetails>(401)]
+    [ProducesResponseType<ProblemDetails>(404)]
+    [ProducesResponseType<ProblemDetails>(412)]
+    [ProducesResponseType<ProblemDetails>(428)]
+    [ProducesResponseType<ProblemDetails>(429)]
+    [ProducesResponseType<ProblemDetails>(503)]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
+    {
+        if (HttpContext.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true || Request.ContentLength > 0)
+        {
+            return Problem(statusCode: 400);
+        }
+        var headerError = IfMatchHeader.Read(Request.Headers, out var version);
+        if (headerError is { } status)
+        {
+            return Problem(statusCode: status);
+        }
+
+        var result = await transfers.CancelAsync(id, version!, cancellationToken);
+        if (result.Error is { } error)
+        {
+            return Failure(error);
+        }
+        Response.Headers.ETag = '"' + result.Version + '"';
+        return NoContent();
+    }
+
     private IActionResult Failure(TransferFailure error) => Problem(statusCode: error switch
     {
         TransferFailure.InvalidInput => 400,
         TransferFailure.Unauthenticated => 401,
         TransferFailure.NotFound => 404,
+        TransferFailure.VersionConflict => 412,
         TransferFailure.InactiveAccount or TransferFailure.IdempotencyConflict => 409,
         _ => 503
     });

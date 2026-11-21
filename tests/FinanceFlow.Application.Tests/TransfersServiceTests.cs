@@ -130,5 +130,7 @@ public sealed class TransfersServiceTests
             Cancellation = cancellationToken;
             return Task.FromResult(View);
         }
+        public Task<TransferCancellationResult> CancelAsync(Guid userId, Guid id, byte[] expectedVersion, DateTimeOffset now,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

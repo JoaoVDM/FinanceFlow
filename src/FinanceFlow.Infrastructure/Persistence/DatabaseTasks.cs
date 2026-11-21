@@ -117,6 +117,8 @@ public static class DatabaseTasks
                   BEGIN
                     SET @grant = N'GRANT SELECT, INSERT ON OBJECT::dbo.Transfers TO ' + QUOTENAME(@username);
                     EXEC(@grant);
+                    SET @grant = N'GRANT UPDATE ON OBJECT::dbo.Transfers (IsCanceled, CanceledAtUtc, UpdatedAtUtc) TO ' + QUOTENAME(@username);
+                    EXEC(@grant);
                   END
                 END
                 """;
@@ -165,7 +167,9 @@ public static class DatabaseTasks
                         OR (major_id = COALESCE(OBJECT_ID('dbo.Categories'), -1)
                           AND COL_NAME(major_id, minor_id) IN ('Name', 'NormalizedName', 'IsActive', 'UpdatedAtUtc'))
                         OR (major_id = COALESCE(OBJECT_ID('dbo.FinancialTransactions'), -1)
-                          AND COL_NAME(major_id, minor_id) IN ('AccountId', 'CategoryId', 'Kind', 'Amount', 'OccurredOn', 'Description', 'UpdatedAtUtc', 'IsDeleted', 'DeletedAtUtc'))))
+                          AND COL_NAME(major_id, minor_id) IN ('AccountId', 'CategoryId', 'Kind', 'Amount', 'OccurredOn', 'Description', 'UpdatedAtUtc', 'IsDeleted', 'DeletedAtUtc'))
+                        OR (major_id = COALESCE(OBJECT_ID('dbo.Transfers'), -1)
+                          AND COL_NAME(major_id, minor_id) IN ('IsCanceled', 'CanceledAtUtc', 'UpdatedAtUtc'))))
                   ))))
               THEN 1 ELSE 0 END
             """;

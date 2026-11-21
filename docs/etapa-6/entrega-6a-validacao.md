@@ -275,3 +275,7 @@ Não resta pendência funcional bloqueante identificada para o commit da 6A. O h
 Limites preservados: mensagens SQL de colisão esperadas em inglês; consulta consolidada sob ReadCommitted não é garantia de snapshot pontual de todo o banco; timeout com resultado incerto exige a mesma chave. Cancelamento operacional pertence à 6B; listagem e extrato à 6C; relatórios à Etapa 7. Nenhuma dessas funcionalidades foi iniciada. Sem alteração em bancos, credenciais, certificados ou volumes persistentes.
 
 **Sem stage, commit ou push. Etapa 6 ainda não concluída.**
+
+## Publicação posterior confirmada pelo usuário — baseline da 6B
+
+Após a auditoria histórica acima, o usuário confirmou **6A publicada em 6050035 — feat: implement idempotent account transfers**, com **557 aprovados, zero falhas/ignorados**, e GitHub Actions **44857771237 — success**. Esses resultados pertencem à 6A, não à [6B](entrega-6b-validacao.md), autorizada posteriormente. As evidências e limitações anteriores foram preservadas. O script Test-DockerSuite.ps1 foi posteriormente atualizado para os logs/contagem da 6B; os caminhos 6a e a contagem 557 descritos acima representam a execução histórica. Nenhum commit ou push foi realizado pelo Codex.

@@ -464,7 +464,7 @@ internal static class ApiDocumentationConfiguration
 
     private static void ConfigureFinancialChanges(OpenApiDocument document)
     {
-        foreach (var path in new[] { "/api/v1/accounts/{id}", "/api/v1/categories/{id}", "/api/v1/transactions/{id}" })
+        foreach (var path in new[] { "/api/v1/accounts/{id}", "/api/v1/categories/{id}", "/api/v1/transactions/{id}", "/api/v1/transfers/{id}" })
         {
             if (document.Paths is null || !document.Paths.TryGetValue(path, out var resource) || resource.Operations is null)
             {

@@ -32,6 +32,21 @@ public sealed class TransfersService(ITransferStore store, ICurrentUser currentU
         return await store.CreateAsync(transfer, key!, TransferCreationFingerprint.Compute(transfer), cancellationToken);
     }
 
+    public Task<TransferCancellationResult> CancelAsync(Guid id, byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
+        {
+            return Task.FromResult(new TransferCancellationResult(Error: TransferFailure.Unauthenticated));
+        }
+        if (expectedVersion is not { Length: 8 })
+        {
+            return Task.FromResult(new TransferCancellationResult(Error: TransferFailure.InvalidInput));
+        }
+
+        return store.CancelAsync(userId, id, expectedVersion.ToArray(), clock.GetUtcNow(), cancellationToken);
+    }
+
     public async Task<TransferReadResult> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId;

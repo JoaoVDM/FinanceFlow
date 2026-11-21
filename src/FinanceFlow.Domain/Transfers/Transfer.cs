@@ -48,6 +48,18 @@ public sealed class Transfer
         };
     }
 
+    public void Cancel(DateTimeOffset canceledAt)
+    {
+        if (IsCanceled)
+        {
+            throw new InvalidOperationException("Canceled transfers cannot be canceled again.");
+        }
+
+        IsCanceled = true;
+        CanceledAtUtc = canceledAt.ToUniversalTime();
+        UpdatedAtUtc = CanceledAtUtc;
+    }
+
     // Check inside the same transaction that retains the account reads until commit (ADR-007).
     public TransferAccountStatus CheckAccounts(FinancialAccount source, FinancialAccount destination)
     {

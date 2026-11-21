@@ -46,7 +46,7 @@ public sealed class TransfersPersistenceSqlTests(IdentitySqlFixture fixture)
     }
 
     [Fact]
-    public async Task Restricted_api_can_only_select_insert_and_real_transfer_columns_use_exact_types()
+    public async Task Restricted_api_preserves_financial_fields_and_real_transfer_columns_use_exact_types()
     {
         using var factory = new SqlApiFactory(fixture);
         using var client = factory.CreateClient();
@@ -75,7 +75,8 @@ public sealed class TransfersPersistenceSqlTests(IdentitySqlFixture fixture)
             await using var denied = connection.CreateCommand();
             denied.CommandText = sql;
             denied.Parameters.AddWithValue("@id", id);
-            Assert.Equal(229, (await Assert.ThrowsAsync<SqlException>(() => denied.ExecuteNonQueryAsync(Cancellation))).Number);
+            Assert.Equal(sql.StartsWith("UPDATE", StringComparison.Ordinal) ? 230 : 229,
+                (await Assert.ThrowsAsync<SqlException>(() => denied.ExecuteNonQueryAsync(Cancellation))).Number);
         }
         await using (var schema = connection.CreateCommand())
         {
