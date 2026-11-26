@@ -57,4 +57,24 @@ public sealed class TransfersService(ITransferStore store, ICurrentUser currentU
         var transfer = await store.GetAsync(userId, id, cancellationToken);
         return transfer is null ? new(Error: TransferFailure.NotFound) : new(Transfer: transfer);
     }
+
+    public Task<TransferListResult> ListAsync(TransferQuery query, CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId;
+        if (userId == Guid.Empty)
+        {
+            return Task.FromResult(new TransferListResult(Error: TransferFailure.Unauthenticated));
+        }
+
+        var today = calendar.DateAt(clock.GetUtcNow());
+        if (query.Page < 1 || query.PageSize is < 1 or > 100
+            || (long)(query.Page - 1) * query.PageSize > int.MaxValue
+            || query.AccountId == Guid.Empty || query.From > today || query.To > today || query.From > query.To
+            || query.Sort is not ("occurredOn" or "amount" or "id") || query.Direction is not ("asc" or "desc"))
+        {
+            return Task.FromResult(new TransferListResult(Error: TransferFailure.InvalidInput));
+        }
+
+        return store.ListAsync(userId, query, cancellationToken);
+    }
 }

@@ -105,5 +105,7 @@ public sealed class TransferCancellationServiceTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<TransferView?> GetAsync(Guid userId, Guid id, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public Task<TransferListResult> ListAsync(Guid userId, TransferQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

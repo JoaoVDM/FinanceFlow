@@ -132,5 +132,7 @@ public sealed class TransfersServiceTests
         }
         public Task<TransferCancellationResult> CancelAsync(Guid userId, Guid id, byte[] expectedVersion, DateTimeOffset now,
             CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<TransferListResult> ListAsync(Guid userId, TransferQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

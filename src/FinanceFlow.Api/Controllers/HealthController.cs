@@ -25,6 +25,10 @@ public sealed class HealthController : ControllerBase
             if (!await db.Database.CanConnectAsync(cancellationToken)
                 || (await db.Database.GetPendingMigrationsAsync(cancellationToken)).Any())
                 return StatusCode(503, new HealthResponse("notReady"));
+            var snapshotState = await db.Database.SqlQuery<int>($"SELECT CAST(snapshot_isolation_state AS int) AS [Value] FROM sys.databases WHERE database_id=DB_ID()")
+                .SingleAsync(cancellationToken);
+            if (snapshotState != 1)
+                return StatusCode(503, new HealthResponse("notReady"));
             // Verify required runtime columns as well as the migration history.
             await db.Users.AsNoTracking().OrderBy(x => x.Id)
                 .Select(x => new { x.Id, x.NormalizedEmail, x.IsActive, x.TokenVersion })

@@ -43,6 +43,20 @@ public static class DatabaseTasks
             create.Parameters.AddWithValue("@database", migration.InitialCatalog);
             await create.ExecuteNonQueryAsync(cancellationToken);
         }
+        // Administrative, explicitly invoked provisioning only. API startup and the restricted
+        // application login never change database options; READ_COMMITTED_SNAPSHOT stays unchanged.
+        await using (var snapshot = connection.CreateCommand())
+        {
+            snapshot.CommandText = """
+                IF EXISTS (SELECT 1 FROM sys.databases WHERE name=@database AND snapshot_isolation_state<>1)
+                BEGIN
+                  DECLARE @sql nvarchar(max) = N'ALTER DATABASE ' + QUOTENAME(@database) + N' SET ALLOW_SNAPSHOT_ISOLATION ON';
+                  EXEC(@sql);
+                END
+                """;
+            snapshot.Parameters.AddWithValue("@database", migration.InitialCatalog);
+            await snapshot.ExecuteNonQueryAsync(cancellationToken);
+        }
         foreach (var identity in new[] { migration, application })
         {
             await connection.ChangeDatabaseAsync("master", cancellationToken);

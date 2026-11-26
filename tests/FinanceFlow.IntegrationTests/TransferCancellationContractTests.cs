@@ -39,7 +39,7 @@ public sealed class TransferCancellationContractTests
         var operation = resource.GetProperty("delete");
 
         Assert.Equal(new[] { "delete", "get" }, resource.EnumerateObject().Select(value => value.Name).Order());
-        Assert.Equal(new[] { "post" }, paths.GetProperty("/api/v1/transfers").EnumerateObject().Select(value => value.Name));
+        Assert.Equal(new[] { "get", "post" }, paths.GetProperty("/api/v1/transfers").EnumerateObject().Select(value => value.Name).Order());
         Assert.True(operation.GetProperty("security")[0].TryGetProperty("Bearer", out _));
         Assert.False(operation.TryGetProperty("requestBody", out _));
         var headers = operation.GetProperty("parameters").EnumerateArray().ToArray();

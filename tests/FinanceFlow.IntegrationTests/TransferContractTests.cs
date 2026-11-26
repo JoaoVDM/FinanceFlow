@@ -66,7 +66,7 @@ public sealed class TransferContractTests
         var paths = json.RootElement.GetProperty("paths");
         var collection = paths.GetProperty("/api/v1/transfers");
         var individual = paths.GetProperty("/api/v1/transfers/{id}");
-        Assert.Equal(new[] { "post" }, collection.EnumerateObject().Select(value => value.Name));
+        Assert.Equal(new[] { "get", "post" }, collection.EnumerateObject().Select(value => value.Name).Order());
         Assert.Equal(new[] { "delete", "get" }, individual.EnumerateObject().Select(value => value.Name).Order());
         foreach (var operation in new[] { collection.GetProperty("post"), individual.GetProperty("get") })
         {

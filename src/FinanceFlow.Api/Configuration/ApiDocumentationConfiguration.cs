@@ -4,6 +4,7 @@ using FinanceFlow.Api.Contracts.Categories;
 using FinanceFlow.Application.Categories;
 using FinanceFlow.Api.Contracts.Transactions;
 using FinanceFlow.Api.Contracts.Transfers;
+using FinanceFlow.Application.Statements;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -27,6 +28,7 @@ internal static class ApiDocumentationConfiguration
             options.AddSchemaTransformer(ConfigureActivitySchemasAsync);
             options.AddSchemaTransformer(ConfigureTransactionSchemasAsync);
             options.AddSchemaTransformer(ConfigureTransferSchemasAsync);
+            options.AddSchemaTransformer(ConfigureStatementSchemasAsync);
             options.AddDocumentTransformer(ConfigureDocumentAsync);
         });
 
@@ -102,7 +104,89 @@ internal static class ApiDocumentationConfiguration
         ConfigureCategoryOperations(document);
         ConfigureFinancialChanges(document);
         ConfigureTransactionOperations(document);
+        ConfigureStatementOperations(document);
         return Task.CompletedTask;
+    }
+
+    private static Task ConfigureStatementSchemasAsync(OpenApiSchema schema, OpenApiSchemaTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        if (context.JsonTypeInfo.Type == typeof(StatementMovement) && schema.Properties is not null)
+        {
+            schema.Properties["operationType"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String, Enum = [JsonValue.Create("transaction"), JsonValue.Create("transfer")],
+                Description = "Discriminates the original FinancialTransaction.Id or Transfer.Id in operationId. No derived persisted ID."
+            };
+            schema.Properties["nature"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String,
+                Enum = [JsonValue.Create("income"), JsonValue.Create("expense"), JsonValue.Create("transferIn"), JsonValue.Create("transferOut")]
+            };
+            schema.Properties["amount"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.Number, Minimum = "-999999999999.99", Maximum = "999999999999.99", MultipleOf = 0.01m,
+                Description = "Signed exact BRL decimal: income/transferIn positive, expense/transferOut negative. No running balance per item."
+            };
+        }
+        if (context.JsonTypeInfo.Type == typeof(AccountStatement) && schema.Properties is not null)
+        {
+            foreach (var name in new[] { "openingBalance", "accountOpeningBalance", "accountOpeningContribution",
+                "income", "expense", "result", "transferIn", "transferOut", "closingBalance" })
+            {
+                var amountSchema = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Number, MultipleOf = 0.01m,
+                    Description = "Exact BRL aggregate or opening position; no per-operation amount cap on computed totals. Transfers are excluded from result."
+                };
+                if (name is "income" or "expense" or "transferIn" or "transferOut")
+                {
+                    amountSchema.Minimum = "0";
+                }
+                schema.Properties[name] = amountSchema;
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    private static void ConfigureStatementOperations(OpenApiDocument document)
+    {
+        foreach (var path in new[] { "/api/v1/transfers", "/api/v1/accounts/{id}/statement" })
+        {
+            if (document.Paths is null || !document.Paths.TryGetValue(path, out var resource)
+                || resource.Operations is null || !resource.Operations.TryGetValue(HttpMethod.Get, out var operation))
+            {
+                continue;
+            }
+            var statement = path.EndsWith("/statement", StringComparison.Ordinal);
+            operation.Description = statement
+                ? "Read-only SNAPSHOT transaction: account, totals, count and SQL-paged movements share one committed view. Required inclusive from/to, at most 366 dates, no future in America/Sao_Paulo. Totals income/expense/transferIn/transferOut are positive magnitudes; result excludes transfers. closingBalance = openingBalance + accountOpeningContribution + income - expense + transferIn - transferOut. Opening contribution applies only when account opens after from and through to; it is not income or a movement. Separate page requests may see later writes. Requires ALLOW_SNAPSHOT_ISOLATION ON; no RCSI."
+                : "Own noncanceled transfers once each, including inactive accounts. Optional accountId matches source OR destination; foreign/missing account returns 404. Optional inclusive dates reject future/order errors without a 366-day list limit. Default occurredOn desc then id asc. Count and SQL page share a SNAPSHOT view; separate requests may see later writes.";
+            foreach (var parameter in operation.Parameters ?? [])
+            {
+                if (parameter is OpenApiParameter writable && parameter.Name is "from" or "to")
+                {
+                    writable.Required = statement;
+                    writable.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date", Pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" };
+                    writable.Description = "Exact yyyy-MM-dd financial date, inclusive; no future. " + (statement ? "Required; maximum 366 included dates." : "Optional; no statement range limit.");
+                }
+            }
+            if (operation.Responses is null)
+            {
+                continue;
+            }
+            foreach (var response in operation.Responses.Values)
+            {
+                if (response is OpenApiResponse writable)
+                {
+                    writable.Headers ??= new Dictionary<string, IOpenApiHeader>();
+                    writable.Headers["Cache-Control"] = new OpenApiHeader
+                    {
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("no-store")] }
+                    };
+                }
+            }
+        }
     }
 
     private static void ConfigureBearerRequirements(OpenApiDocument document)

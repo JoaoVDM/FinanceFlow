@@ -133,6 +133,55 @@ public sealed class TransferStore(FinanceFlowDbContext db, DbContextOptions<Fina
         db.Transfers.AsNoTracking().Where(value => value.Id == id && value.UserId == userId && !value.IsCanceled)
             .Select(Projection).SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<TransferListResult> ListAsync(Guid userId, TransferQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await SnapshotReadSession.RunAsync(db, () => ReadListAsync(userId, query, cancellationToken), cancellationToken);
+        }
+        catch (Exception exception) when (SnapshotReadFailure.IsUnavailable(exception))
+        {
+            return new(Error: TransferFailure.Unavailable);
+        }
+    }
+
+    private async Task<TransferListResult> ReadListAsync(Guid userId, TransferQuery query, CancellationToken cancellationToken)
+    {
+        if (query.AccountId is { } reference && !await db.FinancialAccounts.AsNoTracking()
+            .AnyAsync(account => account.UserId == userId && account.Id == reference, cancellationToken))
+        {
+            return new(Error: TransferFailure.NotFound);
+        }
+
+        var transfers = db.Transfers.AsNoTracking().Where(value => value.UserId == userId && !value.IsCanceled);
+        if (query.AccountId is { } accountId)
+        {
+            transfers = transfers.Where(value => value.SourceAccountId == accountId || value.DestinationAccountId == accountId);
+        }
+        if (query.From is { } from)
+        {
+            transfers = transfers.Where(value => value.OccurredOn >= from);
+        }
+        if (query.To is { } to)
+        {
+            transfers = transfers.Where(value => value.OccurredOn <= to);
+        }
+
+        var count = await transfers.CountAsync(cancellationToken);
+        var ordered = (query.Sort, query.Direction) switch
+        {
+            ("id", "asc") => transfers.OrderBy(value => value.Id),
+            ("id", "desc") => transfers.OrderByDescending(value => value.Id),
+            ("amount", "asc") => transfers.OrderBy(value => value.Amount).ThenBy(value => value.Id),
+            ("amount", "desc") => transfers.OrderByDescending(value => value.Amount).ThenBy(value => value.Id),
+            ("occurredOn", "asc") => transfers.OrderBy(value => value.OccurredOn).ThenBy(value => value.Id),
+            _ => transfers.OrderByDescending(value => value.OccurredOn).ThenBy(value => value.Id)
+        };
+        var items = await ordered.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(Projection).ToListAsync(cancellationToken);
+        return new(Page: new(items, query.Page, query.PageSize, count, (int)Math.Ceiling((decimal)count / query.PageSize)));
+    }
+
     private static IdempotencyRecord CreateRecord(Transfer value, string key, byte[] hash)
     {
         var snapshot = new TransferView(value.Id, value.SourceAccountId, value.DestinationAccountId, value.Amount,
