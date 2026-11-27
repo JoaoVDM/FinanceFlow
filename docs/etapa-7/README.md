@@ -13,8 +13,8 @@ Após publicar, o usuário confirmou SQL Server persistente iniciado por Compose
 | Entrega | Escopo | Estado |
 |---|---|---|
 | 7A | GET /api/v1/reports/summary | Publicada em c6369fc; 798/798 externos; CI #13 / 45919727200 Success |
-| 7B | GET /api/v1/reports/by-category | 858/858 externos e auditoria aprovada para commit; local, sem publicação/CI própria |
-| 7C | Fechamento de consultas/filtros e análise de índices | Pendente; não iniciada |
+| 7B | GET /api/v1/reports/by-category | Publicada em 9db921e; 858/858 externos; CI #14 / 45925546392 Success |
+| 7C | Consolidação de consultas/filtros e análise de índices | 887/887 externos, duas escalas medidas e auditoria aprovada para commit; publicação/CI pendentes |
 
 O resumo representa **fluxo financeiro**: receitas e despesas válidas no período inclusivo, resultado = income - expense. Não inclui saldo inicial, patrimônio ou transferências. Filtro opcional accountId seleciona uma conta própria, inclusive inativa; ausente considera todas as contas do proprietário autenticado. Categorias inativas preservam o histórico.
 
@@ -59,3 +59,40 @@ Os casos concorrentes confirmaram criação de receita, exclusão de despesa e r
 O script atual usa `.local/7b-docker-tests.log` e `.local/7b-docker-results/<execucao>`, exigindo **858/858**, três XMLs completos, zero falhas/ignorados/erros do runner e Docker exit code zero. Preserva integralmente os históricos anteriores. Executar o mesmo comando PowerShell acima. Consulte [implementação, testes e validação da 7B](entrega-7b-validacao.md).
 
 A 7B continua local, **aprovada para commit**, sem publicação/CI própria. Permanecem publicação autorizada, CI própria e consulta NuGet conclusiva. O ambiente persistente desligado foi preservado, sem inicialização ou acesso. **7C e Etapa 8 não foram iniciadas; a Etapa 7 não está concluída.** Nenhum stage, commit ou push foi executado na implementação ou nesta auditoria.
+
+## Estado posterior — Entrega 7C local
+
+Após o histórico acima, o usuário confirmou **7B publicada em 9db921e996d364654bd1ba3aee17af54e1229c06, CI #14 / 45925546392 — Success**, com a mesma baseline **858/858** (116 Domain, 189 Application, 553 Integration). A execução externa anterior e o [registro da 7B](entrega-7b-validacao.md) foram preservados; não são resultados da 7C.
+
+A [matriz dos oito GETs e análise de índices](analise-de-consultas-e-indices.md) identificou três listas com count/página em leituras independentes: accounts, categories e transactions. Elas agora reutilizam SnapshotReadSession, sem alterar filtros, DTOs, ordenação, paginação ou privilégios. O classificador SnapshotReadFailure apenas expõe a causa SQL conhecida para preservar 503 nos contratos de páginas antigos; não amplia a classificação. Limpeza/pooling da SnapshotReadSession permanece intacta.
+
+Foram acrescentados **29 testes Integration**: consistência count/página com escrita coordenada, falhas SQL reais e wrappers conhecidos, extremos válidos/inválidos de paginação, limite de comandos por consulta e reconciliação de todas as projeções em uma sequência financeira com dois proprietários. **887 testes**: 116 Domain, 189 Application, 582 Integration. Os 858 casos anteriores não foram alterados ou reduzidos.
+
+Restore/build Release passaram no sandbox com cinco NU1900. Suíte completa: **887 descobertos, 430 aprovados, 457 falhas de fixture Docker, zero ignorados**, exit 2. Nenhum teste SQL novo foi aprovado pelo sandbox. A ferramenta diagnóstica compilou e gerou SQL offline para os oito recursos, sem conexão. **Não há métricas reais de desempenho ou conclusão sobre planos/índices**; todos os índices foram mantidos, sem migration ou grant novo.
+
+Executar no PowerShell, com Docker Linux:
+
+```powershell
+& C:\FinanceFlow\scripts\Test-DockerSuite.ps1
+& C:\FinanceFlow\scripts\Test-QueryPerformance.ps1
+```
+
+O primeiro exige **887/887**, três XMLs e zero falhas/ignorados/erros do runner; usa `.local/7c-docker-tests.log` e `.local/7c-docker-results/EXECUCAO`. O segundo cria somente recursos descartáveis próprios, com duas escalas sintéticas (200/40000 transações e 50/10000 transferências), aquecimento/repetições, comandos reais dos stores, catálogo, STATISTICS IO/TIME e planos, mantendo artefatos em `.local/7c-performance-results/EXECUCAO`. Não utiliza o ambiente persistente e não concede privilégios extras à API.
+
+A [validação da 7C](entrega-7c-validacao.md) preserva o histórico local e registra o encerramento técnico abaixo. Naquele momento, as medições e a auditoria ainda eram pendentes; não foram apresentadas como aprovadas pelo sandbox.
+
+## Auditoria final e desempenho — 27/11/2026
+
+Validação funcional externa do usuário **20261127-004756-385-23c9ec**: **887/887**, Domain **116**, Application **189**, Integration **582**; três XMLs, zero falhas/ignorados/erros do runner e saídas zero de restore/build/módulos/Docker. A comparação ordinal preserva **todos os 858 casos anteriores**, com exatamente **29 novos Integration**. As três regressões concorrentes comprovam count/página na mesma Snapshot; timeouts reais e wrappers conhecidos mantêm 503, enquanto falha inesperada sem causa SQL permanece 500. A reconciliação integrada alcança todos os estados previstos, de **8000/3000** inicialmente até **9300/2250** após alterações/cancelamento, sem misturar patrimônio e resultado.
+
+A primeira medição, **20261127-010559-574-e85708f8**, concluiu só a escala menor e falhou com **18456** ao gerar novas senhas para logins existentes na segunda escala. A correção manteve uma credencial por login durante a execução e melhorou códigos/etapas/marcador de conclusão; produção, testes e artefatos anteriores foram preservados. O histórico completo permanece no documento de validação.
+
+A segunda medição externa, **20261127-012104-056-56f46de6**, está completa: **250 e 50000 movimentos**, **32 cenários**, dois aquecimentos e cinco repetições, 160 amostras, 64 estatísticas e 64 planos XML reais. Os 190 arquivos foram conferidos, incluindo distribuições/catálogo, completion.json, todos os códigos zero e limpeza dos três recursos próprios. Stores usam a identidade SQL restrita; estatísticas/planos são replay diagnóstico administrativo, sem latência HTTP/JWT.
+
+Na escala maior, medianas do store: extrato **21,516–23,211 ms**, transações **11,921–16,986 ms**, saldo **8,722–9,709 ms**, summary **7,389–7,487 ms**, by-category **7,354–8,427 ms**. A [tabela dos 32 resultados e análise de planos/índices](analise-de-consultas-e-indices.md#medição-externa-completa-e-decisão-final--27112026) inclui mínimos/máximos, leituras lógicas, CPU/decorrido SQL e comandos, sem confundir origens.
+
+O catálogo confirma **17 índices financeiros por base**. Planos mostram scans, seeks, sorts, agregados e sugestões de cobertura; não houve warning/spill registrado nos 64 XMLs. Leituras físicas foram zero. **Decisão: manter índices/consultas**, com cobertura e redução de leituras como melhorias futuras não bloqueantes, não ganho comprovado ou autorização para DDL. Cache aquecido, cinco amostras sequenciais, baixa cardinalidade de cadastros, descrições nulas, ausência de HTTP e de hardware/quotas registrados limitam a conclusão; não se extrapola capacidade de produção.
+
+**APROVADA PARA COMMIT — ETAPA 7 TECNICAMENTE CONCLUÍDA.** Sem achado bloqueante identificado. Apenas os quatro documentos autorizados foram alterados nesta auditoria; código/testes/ferramenta/scripts e evidências anteriores permaneceram preservados por hashes. Main@9db921e, 16 arquivos locais (sete modificados/nove novos), staging vazio e git diff --check aprovado. Não houve stage, commit, push ou acesso ao ambiente persistente. A auditoria NuGet continua inconclusiva: consoles externos sem NU1900 não equivalem a uma consulta de vulnerabilidades conclusiva.
+
+**7C ainda não publicada nem aprovada pela CI; o encerramento oficial da Etapa 7 depende da publicação autorizada e CI correspondente. Etapa 8 permanece pendente.**

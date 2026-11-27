@@ -209,6 +209,18 @@ public sealed class FinancialTransactionStore(FinanceFlowDbContext db, DbContext
 
     public async Task<TransactionListResult> ListAsync(Guid userId, TransactionQuery query, CancellationToken cancellationToken)
     {
+        try
+        {
+            return await SnapshotReadSession.RunAsync(db, () => ReadListAsync(userId, query, cancellationToken), cancellationToken);
+        }
+        catch (Exception exception) when (SnapshotReadFailure.IsUnavailable(exception))
+        {
+            return new(Error: TransactionFailure.Unavailable);
+        }
+    }
+
+    private async Task<TransactionListResult> ReadListAsync(Guid userId, TransactionQuery query, CancellationToken cancellationToken)
+    {
         if ((query.AccountId is { } accountId && !await db.FinancialAccounts.AnyAsync(account => account.Id == accountId && account.UserId == userId, cancellationToken))
             || (query.CategoryId is { } categoryId && !await db.Categories.AnyAsync(category => category.Id == categoryId && category.UserId == userId, cancellationToken)))
         {

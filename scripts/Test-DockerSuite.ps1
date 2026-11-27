@@ -5,10 +5,10 @@ $ErrorActionPreference = 'Stop'
 $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $localRoot = Join-Path $workspaceRoot '.local'
 $runId = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 6)
-$reportsRoot = Join-Path $localRoot ('7b-docker-results/' + $runId)
+$reportsRoot = Join-Path $localRoot ('7c-docker-results/' + $runId)
 New-Item -ItemType Directory -Path $reportsRoot -Force | Out-Null
 
-$logPath = Join-Path $localRoot '7b-docker-tests.log'
+$logPath = Join-Path $localRoot '7c-docker-tests.log'
 $runLogPath = Join-Path $reportsRoot 'console.log'
 $encoding = New-Object System.Text.UTF8Encoding($false)
 $combinedLog = New-Object System.IO.StreamWriter($logPath, $true, $encoding)
@@ -118,9 +118,9 @@ Write-Output "XML reports: $reportCount/3; total: $total; passed: $passed; faile
 if (Select-String -LiteralPath $runLogPath -Pattern 'NU1900' -Quiet) {
     Write-Output 'NU1900 present: NuGet vulnerability audit remains inconclusive.'
 }
-if ($dockerExit -eq 0 -and ($reportCount -ne 3 -or $total -ne 858 -or $passed -ne 858 -or $failed -ne 0 -or $skipped -ne 0 -or $errors -ne 0)) {
+if ($dockerExit -eq 0 -and ($reportCount -ne 3 -or $total -ne 887 -or $passed -ne 887 -or $failed -ne 0 -or $skipped -ne 0 -or $errors -ne 0)) {
     # Preserve Docker's exit code separately; fail the diagnostic if discovery/reporting is incomplete.
-    Write-Output 'Docker returned 0, but the expected 858/858 is not established by complete reports.'
+    Write-Output 'Docker returned 0, but the expected 887/887 is not established by complete reports.'
     exit 3
 }
 exit $dockerExit

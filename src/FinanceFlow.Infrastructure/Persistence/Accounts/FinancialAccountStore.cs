@@ -1,5 +1,6 @@
 using System.Data;
 using System.Linq.Expressions;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using FinanceFlow.Application.Accounts;
@@ -34,6 +35,21 @@ public sealed class FinancialAccountStore(
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<AccountPage> ListAsync(Guid userId, AccountQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await SnapshotReadSession.RunAsync(db, () => ReadListAsync(userId, query, cancellationToken), cancellationToken);
+        }
+        catch (Exception exception) when (SnapshotReadFailure.IsUnavailable(exception))
+        {
+            // The existing page contract has no failure result. Preserve the provider cause
+            // for the global safe DbException -> 503 handler, including EF wrappers.
+            ExceptionDispatchInfo.Capture(SnapshotReadFailure.UnavailableSqlException(exception)!).Throw();
+            throw;
+        }
+    }
+
+    private async Task<AccountPage> ReadListAsync(Guid userId, AccountQuery query, CancellationToken cancellationToken)
     {
         var accounts = db.FinancialAccounts.AsNoTracking().Where(account => account.UserId == userId);
         if (query.IsActive is { } isActive)

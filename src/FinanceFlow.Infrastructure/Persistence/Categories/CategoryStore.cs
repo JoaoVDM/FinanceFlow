@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Runtime.ExceptionServices;
 using FinanceFlow.Application.Categories;
 using FinanceFlow.Domain.Categories;
 using Microsoft.Data.SqlClient;
@@ -52,6 +53,19 @@ public sealed class CategoryStore(FinanceFlowDbContext db) : ICategoryStore
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<CategoryPage> ListAsync(Guid userId, CategoryQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await SnapshotReadSession.RunAsync(db, () => ReadListAsync(userId, query, cancellationToken), cancellationToken);
+        }
+        catch (Exception exception) when (SnapshotReadFailure.IsUnavailable(exception))
+        {
+            ExceptionDispatchInfo.Capture(SnapshotReadFailure.UnavailableSqlException(exception)!).Throw();
+            throw;
+        }
+    }
+
+    private async Task<CategoryPage> ReadListAsync(Guid userId, CategoryQuery query, CancellationToken cancellationToken)
     {
         var categories = db.Categories.AsNoTracking().Where(category => category.UserId == userId);
         if (query.Kind is { } kind)
