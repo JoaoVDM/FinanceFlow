@@ -12,8 +12,8 @@ Após publicar, o usuário confirmou SQL Server persistente iniciado por Compose
 
 | Entrega | Escopo | Estado |
 |---|---|---|
-| 7A | GET /api/v1/reports/summary | 798/798 externos e auditoria aprovada para commit; não publicada/sem CI própria |
-| 7B | Agrupamento por categoria | Pendente; não iniciada |
+| 7A | GET /api/v1/reports/summary | Publicada em c6369fc; 798/798 externos; CI #13 / 45919727200 Success |
+| 7B | GET /api/v1/reports/by-category | 858/858 externos e auditoria aprovada para commit; local, sem publicação/CI própria |
 | 7C | Fechamento de consultas/filtros e análise de índices | Pendente; não iniciada |
 
 O resumo representa **fluxo financeiro**: receitas e despesas válidas no período inclusivo, resultado = income - expense. Não inclui saldo inicial, patrimônio ou transferências. Filtro opcional accountId seleciona uma conta própria, inclusive inativa; ausente considera todas as contas do proprietário autenticado. Categorias inativas preservam o histórico.
@@ -38,4 +38,24 @@ Executar externamente, com Docker Linux/SQL Server/Testcontainers:
 
 O script exige **798/798**, três XMLs e zero falhas/ignorados/erros do runner, com código Docker zero. As execuções 7A usam `.local/7a-docker-tests.log` e `.local/7a-docker-results/<execucao>`; os históricos 6A/6B/6C permanecem preservados. Nenhum banco persistente é utilizado pela suíte.
 
-Sem stage, commit ou push. Faltam publicação autorizada e aprovação da CI própria; a auditoria NuGet permanece inconclusiva. O ambiente persistente não foi acessado ou modificado. A Etapa 7 não está concluída; não foram iniciadas 7B, 7C ou Etapa 8. Consulte [contrato, implementação, testes e resultados da 7A](entrega-7a-validacao.md).
+Naquele encerramento da 7A não houve stage, commit ou push pelo Codex; publicação e CI ainda eram pendentes. **Posteriormente, o usuário confirmou a publicação da 7A em c6369fcf6afcd88b5edb50272a30cc92e7c9c93d, com GitHub Actions #13 / 45919727200 — Success e baseline de 798/798.** O histórico acima e o [registro da 7A](entrega-7a-validacao.md) permanecem preservados; as referências a caminhos/contagem 7a descrevem aquela execução.
+
+## Entrega 7B — agrupamento por categoria
+
+`GET /api/v1/reports/by-category` exige `from`/`to` exatos e inclusivos (até 366 datas, sem futuro financeiro em America/Sao_Paulo). Filtros opcionais: conta própria e `kind=income|expense`. Retorna array de `{categoryId,name,kind,total}`; vazio válido é `[]`. Ordem SQL fixa: kind asc, total desc, categoryId asc. Não há envelope, paginação ou percentuais.
+
+O agrupamento por ID preserva categorias de mesmo nome com tipos distintos, apresenta o nome atual e inclui histórico inativo. Exclui transações apagadas logicamente, saldo inicial e todas as transferências. A soma de cada natureza reconcilia com o summary em dados estáveis; chamadas separadas não representam o mesmo Snapshot durante escritas concorrentes. Summary mantém o contrato publicado e rejeita `kind`.
+
+ReportsController/ReportsService/IReportStore/ReportStore foram estendidos, reutilizando FinancialCalendar e SnapshotReadSession/SnapshotReadFailure. Propriedade da conta, nomes e agregados usam a mesma transação Snapshot; a limpeza do pool permanece intacta. Nenhuma migration, índice, grant, dependência ou infraestrutura compartilhada foi alterada.
+
+Cobertura nova: **23 Application e 37 Integration**, total **858** (116 Domain, 189 Application, 553 Integration). Restore/build passaram no sandbox com cinco NU1900. A suíte completa descobriu 858: **430 aprovados, 428 falhas de fixture Docker, zero ignorados**. Naquela execução local os testes SQL não alcançaram suas asserções e não foram aprovados pelo sandbox. A geração SQL offline confirmou JOIN/GROUP BY/SUM/ORDER BY, sem abrir conexão; não substitui SQL Server real.
+
+A **primeira execução externa do usuário**, **20261126-222947-267-8d877f**, aprovou **858/858: 116 Domain, 189 Application e 553 Integration**, três XMLs completos, zero falhas/ignorados/erros do runner e códigos zero de restore/build/módulos/Docker. A comparação ordinal de nomes e multiplicidades com os XMLs finais da 7A confirmou todos os **798 casos anteriores** e exatamente **60 novos**. Nenhum teste foi removido ou enfraquecido nas duas adaptações de double/guarda de rotas.
+
+Os casos concorrentes confirmaram criação de receita, exclusão de despesa e renomeação de categoria entre as leituras coordenadas: a resposta original mantém nomes/totais anteriores e a seguinte reflete o novo estado. Overflow/timeout exigem **8115/-2**, HTTP **503**, ausência de grupos parciais e nova consulta com total **2**; a falha inesperada permanece **500**. O output do teste de pooling registra **SPID 201**, **ClientConnectionId dbe28884-85ef-48da-a226-67bea56b6d3b**, isolamento **3/5/2/2** e @@TRANCOUNT **0/1/0/0** antes/durante/depois/final. As asserções seguintes alcançam conexão fechada/transação nula antes do descarte do DbContext, identidade real, revogação e consulta posterior válida com total **1,01**. Não são valores inventados ou derivados de uma conexão diferente.
+
+**7B APROVADA PARA COMMIT**, sem achado técnico bloqueante na revisão dos 19 arquivos contra c6369fc. Regras financeiras, filtro de proprietário, contrato do summary, Snapshot, pooling e privilégios foram preservados; não há migration, índice, dependência ou workflow novo. Nesta auditoria foram alterados apenas README.md, este documento e entrega-7b-validacao.md; os demais **16 arquivos** foram preservados por hashes SHA-256, staging vazio e git diff --check aprovado. O console externo teve build com zero warnings e nenhuma ocorrência de NU1900; isso não comprova uma nova auditoria de vulnerabilidades conclusiva.
+
+O script atual usa `.local/7b-docker-tests.log` e `.local/7b-docker-results/<execucao>`, exigindo **858/858**, três XMLs completos, zero falhas/ignorados/erros do runner e Docker exit code zero. Preserva integralmente os históricos anteriores. Executar o mesmo comando PowerShell acima. Consulte [implementação, testes e validação da 7B](entrega-7b-validacao.md).
+
+A 7B continua local, **aprovada para commit**, sem publicação/CI própria. Permanecem publicação autorizada, CI própria e consulta NuGet conclusiva. O ambiente persistente desligado foi preservado, sem inicialização ou acesso. **7C e Etapa 8 não foram iniciadas; a Etapa 7 não está concluída.** Nenhum stage, commit ou push foi executado na implementação ou nesta auditoria.

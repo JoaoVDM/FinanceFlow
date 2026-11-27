@@ -48,7 +48,7 @@ public sealed class ReportContractTests
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         var paths = json.RootElement.GetProperty("paths");
         var reportPaths = paths.EnumerateObject().Where(value => value.Name.StartsWith("/api/v1/reports", StringComparison.Ordinal));
-        Assert.Equal("/api/v1/reports/summary", Assert.Single(reportPaths).Name);
+        Assert.Equal(new[] { "/api/v1/reports/by-category", "/api/v1/reports/summary" }, reportPaths.Select(value => value.Name).Order());
         var operation = paths.GetProperty("/api/v1/reports/summary").GetProperty("get");
         Assert.True(operation.GetProperty("security")[0].TryGetProperty("Bearer", out _));
         Assert.Contains("SNAPSHOT", operation.GetProperty("description").GetString());

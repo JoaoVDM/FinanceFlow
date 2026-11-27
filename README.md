@@ -36,6 +36,8 @@ Estado posterior à auditoria de 6A: o usuário confirmou sua publicação em **
 
 **Auditoria final da 7A — 26/11:** a primeira execução externa **20261126-023548-931-084230** teve **795/798**, com três falhas de instrumentação: substituição ampla de Amount causava SQL 8155 em vez de overflow 8115; @@SPID smallint era lido como Int32 nos dois casos de pooling. Foram corrigidos somente os dois testes e sua documentação, preservando produção e os demais arquivos por hashes. A execução externa final do usuário, **20261126-214221-889-68195a**, comprovou **798/798: 116 Domain, 166 Application, 516 Integration**, três XMLs completos, zero falhas/ignorados/erros do runner e saídas zero de restore/build/módulos/Docker. O Codex confirmou nomes e multiplicidades dos 741 casos anteriores, os 57 adicionais e as asserções posteriores das três correções. **7A APROVADA PARA COMMIT**, sem achado bloqueante; continua não publicada e sem CI própria aprovada. A auditoria NuGet permanece inconclusiva.
 
+**Estado atual — 7B:** após aquela auditoria, a **7A foi publicada em c6369fc**, com **CI #13 / 45919727200 — Success**, conforme confirmação do usuário. A 7B acrescenta localmente o relatório por categoria e 60 testes, totalizando **858**. A primeira execução externa do usuário, **20261126-222947-267-8d877f**, aprovou **858/858: 116 Domain, 189 Application, 553 Integration**, zero falhas/ignorados/erros do runner e saídas zero de restore/build/módulos/Docker. A comparação dos XMLs preserva os 798 casos anteriores por nomes e multiplicidades, com exatamente 60 novos. **7B APROVADA PARA COMMIT**, ainda não publicada/sem CI própria. O histórico anterior descreve as respectivas execuções, sem atribuí-las à 7B. Containers persistentes desligados permanecem preservados; 7C e Etapa 8 não foram iniciadas.
+
 ## Requisitos e instalação
 
 - .NET SDK estável da faixa 10.0.4xx; global.json aceita patches dessa faixa, incluindo 10.0.404.
@@ -206,13 +208,23 @@ Conta, agregados e página compartilham **Snapshot**; páginas de requisições 
 
 O ciclo Snapshot mantém a mesma conexão física aberta até encerrar/descartar a transação e restaurar **ReadCommitted**, antes do retorno ao pool. A limpeza independe do token cancelado e tem timeout limitado; preserva a exceção original. Se não puder garantir restauração, aposenta somente o pool correspondente. Os testes reais confirmaram reutilização da mesma sessão por SPID e ClientConnectionId, inclusive após cancelamento. Pooling permanece habilitado; não há ClearAllPools, retries ou ampliação de privilégios.
 
-## Resumo financeiro — Entrega 7A local
+## Resumo financeiro — Entrega 7A publicada
 
 `GET /api/v1/reports/summary?from=2026-11-01&to=2026-11-26` exige JWT válido/não revogado e retorna somente `currency`, `from`, `to`, `income`, `expense` e `result`. Income/expense são magnitudes positivas de receitas/despesas válidas no período inclusivo; `result = income - expense`. Não inclui saldo inicial ou transferências, nem representa patrimônio. Sem contas/movimentos retorna 200 com zeros.
 
 `accountId` opcional seleciona uma conta própria, inclusive inativa; ausente considera todas as contas do usuário autenticado. Conta alheia/inexistente retorna o mesmo 404. Categorias inativas preservam histórico; excluídas logicamente ficam fora da soma. Datas exatas yyyy-MM-dd, sem futuro em America/Sao_Paulo, com até 366 datas incluídas. Queries desconhecidas, duplicadas, vazias ou inválidas retornam 400. Problem Details, Bearer, revogação, 429/Retry-After e no-store seguem o pipeline existente. Não há paginação, agrupamento ou ETag no relatório.
 
 Agregações condicionais são executadas no SQL Server, com decimal exato e subtração final verificada no C#. Propriedade da conta e totais compartilham SnapshotReadSession e sua limpeza do pool. A 7A não altera essa infraestrutura, schema, migrations ou permissões; usa os índices existentes. Nenhuma operação foi executada contra o ambiente persistente. Consulte [contrato, testes SQL e validação externa da 7A](docs/etapa-7/entrega-7a-validacao.md).
+
+**Publicação posterior da 7A:** commit **c6369fc**, GitHub Actions **#13 / 45919727200 — Success**, baseline **798/798** (116 Domain, 166 Application, 516 Integration), conforme confirmação do usuário. O histórico de implementação e auditoria acima permanece registrado; esses resultados não são atribuídos à 7B.
+
+## Relatório por categoria — Entrega 7B local
+
+`GET /api/v1/reports/by-category?from=2026-11-01&to=2026-11-26` retorna uma coleção de `{categoryId, name, kind, total}`. `accountId` e `kind=income|expense` são opcionais; os demais requisitos de período, autenticação e validação estrita são os mesmos do resumo. A ordenação fixa no SQL é **kind asc, total desc, categoryId asc**. Sem movimentos válidos retorna `[]`, sem paginação ou percentuais.
+
+O agrupamento usa a identidade da categoria, seu nome atual e natureza compatível, preservando histórico de contas/categorias inativas. Totais positivos em decimal excluem saldo inicial, transferências e transações excluídas. Propriedade, nomes e somas compartilham SnapshotReadSession, sem alterar sua proteção do pool. O endpoint summary continua rejeitando `kind`. Não há migration, índice, dependência ou permissão nova.
+
+Foram adicionados **60 testes**; a suíte possui **858**. Restore/build Release passaram com cinco NU1900; no sandbox houve **430 aprovados, 428 falhas de fixture Docker, zero ignorados**. Esse histórico local permanece separado da primeira execução externa do usuário, **20261126-222947-267-8d877f**, que aprovou **858/858**, três XMLs completos e todos os exit codes zero. Overflow exige SQL 8115/HTTP 503 sem grupos parciais; concorrência mantém nomes/totais na mesma Snapshot e pooling preserva SPID/ClientConnectionId, restaura ReadCommitted e alcança JWT/revogação. **Auditoria final aprovada para commit**, sem achado bloqueante, com os demais 16 arquivos preservados por hashes. Para reproduzir: `& C:\FinanceFlow\scripts\Test-DockerSuite.ps1`, com logs próprios `7b`. Consulte [contrato, evidências concretas e parecer da 7B](docs/etapa-7/entrega-7b-validacao.md). Ambiente persistente preservado; publicação/CI própria e auditoria NuGet conclusiva permanecem pendentes. 7C e Etapa 8 não foram iniciadas.
 
 ## Endpoints de identidade
 
@@ -269,7 +281,7 @@ docs/
   etapa-4/                     Entregas A/B, refatoração e evidências de validação
   etapa-5/                     Etapa concluída; histórico e evidências de 5A/5B/5C
   etapa-6/                     Criação de transferências, saldo integrado e validação de 6A
-  etapa-7/                     Resumo financeiro 7A local; 7B/7C pendentes
+  etapa-7/                     Resumo 7A publicado; categorias 7B local; 7C pendente
 ```
 
 Referências: Api → Application/Infrastructure; Application → Domain; Infrastructure → Application/Domain; Domain sem referências de projeto ou pacotes de infraestrutura. Os projetos sem funcionalidades permanecem sem classes artificiais. Não há CQRS completo, MediatR, repositório genérico ou mapeamento automático.
@@ -284,6 +296,6 @@ O workflow em .github/workflows/build.yml verifica Docker e executa restore, bui
 
 ## Próximos passos
 
-As Etapas 1 a 6 estão concluídas: **6C publicada em d303fc2, com 741/741 e CI #12 / 45751367056 aprovada**, conforme confirmação do usuário. A **7A possui 798/798 aprovados externamente e auditoria final aprovada para commit**; faltam publicação autorizada e CI própria aprovada. Para reproduzir: `& C:\FinanceFlow\scripts\Test-DockerSuite.ps1` (logs próprios 7a). **7B e 7C continuam pendentes; a Etapa 7 não está concluída e a Etapa 8 não foi iniciada.** Repetir a auditoria NuGet com índice acessível; a ausência de NU1900 no log externo não equivale a consulta de vulnerabilidades conclusiva. Sem stage, commit, push ou alteração do ambiente persistente pelo Codex. Veja [evidências e comando externo da 7A](docs/etapa-7/entrega-7a-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
+As Etapas 1 a 6 estão concluídas: **6C publicada em d303fc2, com 741/741 e CI #12 / 45751367056 aprovada**, conforme confirmação do usuário. A **7A foi publicada em c6369fc, com 798/798 e CI #13 / 45919727200 — Success**. A **7B possui 858/858 aprovados externamente e auditoria final aprovada para commit**, ainda local, aguardando publicação autorizada e CI própria. Para reproduzir: `& C:\FinanceFlow\scripts\Test-DockerSuite.ps1` (logs próprios 7b). **7C permanece pendente; a Etapa 7 não está concluída e a Etapa 8 não foi iniciada.** A auditoria NuGet continua inconclusiva. Sem stage, commit, push ou alteração do ambiente persistente pelo Codex. Veja [evidências e comando externo da 7B](docs/etapa-7/entrega-7b-validacao.md), [roadmap](docs/etapa-1/backlog-e-roadmap.md) e [contratos](docs/etapa-1/contratos-rest.md).
 
 Licença MIT é a proposta registrada para a preparação da release; nenhum arquivo de licença foi incluído nesta etapa. Resultados de testes e prontidão devem ser avaliados pelas evidências, sem badges de sucesso não verificados.

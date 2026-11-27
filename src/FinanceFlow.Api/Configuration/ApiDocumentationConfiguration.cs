@@ -108,6 +108,7 @@ internal static class ApiDocumentationConfiguration
         ConfigureTransactionOperations(document);
         ConfigureStatementOperations(document);
         ConfigureReportOperations(document);
+        ConfigureCategoryReportOperation(document);
         return Task.CompletedTask;
     }
 
@@ -135,7 +136,72 @@ internal static class ApiDocumentationConfiguration
                 schema.Properties[name] = amount;
             }
         }
+        if (context.JsonTypeInfo.Type == typeof(CategoryReportGroup) && schema.Properties is not null)
+        {
+            schema.Properties["kind"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String, Enum = [JsonValue.Create("income"), JsonValue.Create("expense")]
+            };
+            schema.Properties["total"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.Number, Minimum = "0", MultipleOf = 0.01m,
+                Description = "Positive BRL magnitude, exact SQL sum for this category identity. No per-transaction cap on aggregate totals."
+            };
+        }
         return Task.CompletedTask;
+    }
+
+    private static void ConfigureCategoryReportOperation(OpenApiDocument document)
+    {
+        if (document.Paths is null || !document.Paths.TryGetValue("/api/v1/reports/by-category", out var path)
+            || path.Operations is null || !path.Operations.TryGetValue(HttpMethod.Get, out var operation))
+        {
+            return;
+        }
+        operation.Description = "Own valid income/expense grouped by category ID with the current category name and compatible kind. "
+            + "Positive exact BRL totals; excludes deleted transactions, opening balances and all transfers. Inactive accounts/categories remain included. "
+            + "Required inclusive yyyy-MM-dd from/to, no future in America/Sao_Paulo, maximum 366 dates. Optional own accountId and canonical income/expense kind. "
+            + "Foreign/missing account: 404. No movements: 200 with []. No pagination, percentages or balance. "
+            + "Fixed SQL order: kind asc, total desc, categoryId asc (SQL Server GUID ordering). Account ownership, names and grouped totals share SNAPSHOT.";
+        foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
+        {
+            if (parameter.Name is "from" or "to")
+            {
+                parameter.Required = true;
+                parameter.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date", Pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" };
+                parameter.Description = "Required exact inclusive date; maximum 366 included dates, no future.";
+            }
+            else if (parameter.Name == "kind")
+            {
+                parameter.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("income"), JsonValue.Create("expense")] };
+                parameter.Description = "Optional canonical kind; omit to include both. Empty values are invalid.";
+            }
+            else if (parameter.Name == "accountId")
+            {
+                parameter.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" };
+                parameter.Description = "Optional nonempty own account ID; inactive allowed. Omit for all own accounts.";
+            }
+        }
+        foreach (var response in operation.Responses?.Values.OfType<OpenApiResponse>() ?? [])
+        {
+            response.Headers ??= new Dictionary<string, IOpenApiHeader>();
+            response.Headers["Cache-Control"] = new OpenApiHeader
+            {
+                Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("no-store")] }
+            };
+        }
+        if (operation.Responses?.TryGetValue("200", out var success) == true
+            && success.Content?.TryGetValue("application/json", out var media) == true)
+        {
+            media.Examples = new Dictionary<string, IOpenApiExample>
+            {
+                ["groups"] = new OpenApiExample
+                {
+                    Value = JsonNode.Parse("""[{"categoryId":"22222222-2222-2222-2222-222222222222","name":"Alimentação","kind":"expense","total":350.00},{"categoryId":"33333333-3333-3333-3333-333333333333","name":"Academia","kind":"expense","total":150.00},{"categoryId":"11111111-1111-1111-1111-111111111111","name":"Salário","kind":"income","total":4500.00}]""")
+                },
+                ["empty"] = new OpenApiExample { Value = new JsonArray() }
+            };
+        }
     }
 
     private static void ConfigureReportOperations(OpenApiDocument document)

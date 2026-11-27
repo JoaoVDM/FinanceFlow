@@ -95,6 +95,8 @@ public sealed class ReportsServiceTests
     private sealed class User(Guid id) : ICurrentUser { public Guid UserId => id; }
     private sealed class Store : IReportStore
     {
+        public Task<CategoryReportResult> GetByCategoryAsync(Guid userId, CategoryReportQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("This double verifies summary dispatch only.");
         public SummaryResult Result { get; init; } = new();
         public int Calls { get; private set; }
         public Guid Owner { get; private set; }
