@@ -5,6 +5,7 @@ using FinanceFlow.Application.Categories;
 using FinanceFlow.Api.Contracts.Transactions;
 using FinanceFlow.Api.Contracts.Transfers;
 using FinanceFlow.Application.Statements;
+using FinanceFlow.Application.Reports;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -29,6 +30,7 @@ internal static class ApiDocumentationConfiguration
             options.AddSchemaTransformer(ConfigureTransactionSchemasAsync);
             options.AddSchemaTransformer(ConfigureTransferSchemasAsync);
             options.AddSchemaTransformer(ConfigureStatementSchemasAsync);
+            options.AddSchemaTransformer(ConfigureReportSchemasAsync);
             options.AddDocumentTransformer(ConfigureDocumentAsync);
         });
 
@@ -105,7 +107,72 @@ internal static class ApiDocumentationConfiguration
         ConfigureFinancialChanges(document);
         ConfigureTransactionOperations(document);
         ConfigureStatementOperations(document);
+        ConfigureReportOperations(document);
         return Task.CompletedTask;
+    }
+
+    private static Task ConfigureReportSchemasAsync(OpenApiSchema schema, OpenApiSchemaTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        if (context.JsonTypeInfo.Type == typeof(FinancialSummary) && schema.Properties is not null)
+        {
+            schema.Examples = [JsonNode.Parse("""{"currency":"BRL","from":"2026-11-01","to":"2026-11-26","income":4500.00,"expense":500.00,"result":4000.00}""")!];
+            schema.Properties["currency"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.String, Enum = [JsonValue.Create("BRL")]
+            };
+            foreach (var name in new[] { "income", "expense", "result" })
+            {
+                var amount = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Number, MultipleOf = 0.01m,
+                    Description = "Exact BRL aggregate, not limited to the maximum of one transaction. Opening balances and all transfers are excluded."
+                };
+                if (name is "income" or "expense")
+                {
+                    amount.Minimum = "0";
+                }
+                schema.Properties[name] = amount;
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    private static void ConfigureReportOperations(OpenApiDocument document)
+    {
+        if (document.Paths is null || !document.Paths.TryGetValue("/api/v1/reports/summary", out var path)
+            || path.Operations is null || !path.Operations.TryGetValue(HttpMethod.Get, out var operation))
+        {
+            return;
+        }
+        operation.Description = "Own financial flow in BRL: income and expense are positive magnitudes; result = income - expense. "
+            + "Excludes opening balances and all transfers, including canceled ones. Includes inactive accounts/categories and excludes deleted transactions. "
+            + "Optional accountId restricts transactions to one own account; missing/foreign account returns 404, an empty valid account returns zero totals. "
+            + "Without accountId, includes all own accounts. Required inclusive from/to in yyyy-MM-dd, at most 366 dates, no future in America/Sao_Paulo. "
+            + "Ownership and conditional SQL sums share one SNAPSHOT; requires ALLOW_SNAPSHOT_ISOLATION ON, no fallback or RCSI. "
+            + "Example: ?from=2026-11-01&to=2026-11-26 returns {currency: BRL, from: 2026-11-01, to: 2026-11-26, income: 4500.00, expense: 500.00, result: 4000.00}.";
+        foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
+        {
+            if (parameter.Name is "from" or "to")
+            {
+                parameter.Required = true;
+                parameter.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date", Pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" };
+                parameter.Description = "Required exact yyyy-MM-dd financial date, inclusive; at most 366 included dates, no future.";
+            }
+            else if (parameter.Name == "accountId")
+            {
+                parameter.Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" };
+                parameter.Description = "Optional nonempty own account ID; inactive allowed. Omit to include all own accounts. Foreign/missing: 404.";
+            }
+        }
+        foreach (var response in operation.Responses?.Values.OfType<OpenApiResponse>() ?? [])
+        {
+            response.Headers ??= new Dictionary<string, IOpenApiHeader>();
+            response.Headers["Cache-Control"] = new OpenApiHeader
+            {
+                Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("no-store")] }
+            };
+        }
     }
 
     private static Task ConfigureStatementSchemasAsync(OpenApiSchema schema, OpenApiSchemaTransformerContext context,
@@ -202,6 +269,7 @@ internal static class ApiDocumentationConfiguration
             || path.Key.StartsWith("/api/v1/categories", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/transactions", StringComparison.Ordinal)
             || path.Key.StartsWith("/api/v1/transfers", StringComparison.Ordinal)
+            || path.Key.StartsWith("/api/v1/reports", StringComparison.Ordinal)
             || path.Key.EndsWith("/auth/logout", StringComparison.Ordinal));
 
         foreach (var path in protectedPaths)

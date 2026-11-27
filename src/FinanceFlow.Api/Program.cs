@@ -81,6 +81,7 @@ app.Use(async (context, next) =>
 
     if (context.Request.Path.StartsWithSegments("/api/v1/transactions")
         || context.Request.Path.StartsWithSegments("/api/v1/transfers")
+        || context.Request.Path.StartsWithSegments("/api/v1/reports")
         || (HttpMethods.IsGet(context.Request.Method)
             && context.Request.Path.StartsWithSegments("/api/v1/accounts")
             && (context.Request.Path.Value!.TrimEnd('/').EndsWith("/balance", StringComparison.OrdinalIgnoreCase)
